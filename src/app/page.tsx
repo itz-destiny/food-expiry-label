@@ -70,7 +70,7 @@ export default function Home() {
           />
           <div className="absolute inset-0 bg-black/40" />
           <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white p-4">
-            <h1 className="text-4xl md:text-6xl font-headline font-bold">Shelf Watch</h1>
+            <h1 className="text-4xl md:text-6xl font-headline font-black uppercase tracking-wider">Label Guard</h1>
             <p className="text-lg md:text-xl max-w-3xl mt-4">
               Your eyes on expiry dates. Report suspicious food labels and help ensure community food safety.
             </p>
@@ -123,7 +123,7 @@ export default function Home() {
         </div>
 
         <div className="md:col-span-2 sticky top-24 space-y-6">
-          <h2 className="text-3xl font-headline">Analysis Result</h2>
+          <h2 className="text-3xl font-headline font-bold">Analysis Result</h2>
           {state.message && (
             <Alert variant={state.error ? 'destructive' : 'default'} className={cn(!state.error && "bg-accent/50 border-accent")}>
               <AlertTriangle className="h-4 w-4" />
