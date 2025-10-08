@@ -3,16 +3,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { mockReports, reportsByMonth } from "./mock-data";
 import { format } from "date-fns";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { FileWarning, ListChecks, Hourglass } from "lucide-react";
+import { BarChart, FileWarning, ListChecks, Hourglass, Loader2 } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig
-} from "@/components/ui/chart"
+} from "@/components/ui/chart";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useMemo } from "react";
+import { collection, query, orderBy, Timestamp } from "firebase/firestore";
+import { Bar, ResponsiveContainer, XAxis, YAxis } from "recharts";
+
+
+export type Report = {
+  id: string;
+  productName: string;
+  storeLocation: string;
+  submissionDate: Timestamp;
+  reportStatus: "Pending" | "Reviewed" | "Action Taken";
+  analysisResult: string;
+};
 
 const chartConfig = {
   reports: {
@@ -22,8 +34,37 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function AdminPage() {
-  const totalReports = mockReports.length;
-  const pendingReports = mockReports.filter(r => r.status === 'Pending').length;
+  const firestore = useFirestore();
+  
+  const reportsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'reports'), orderBy('submissionDate', 'desc'));
+  }, [firestore]);
+
+  const { data: reports, isLoading } = useCollection<Report>(reportsQuery);
+  
+  const totalReports = reports?.length ?? 0;
+  const pendingReports = reports?.filter(r => r.reportStatus === 'Pending').length ?? 0;
+
+  const reportsByMonth = useMemo(() => {
+    if (!reports) return [];
+    const monthCounts = reports.reduce((acc, report) => {
+        if (report.submissionDate) {
+            const month = format(report.submissionDate.toDate(), "MMM");
+            acc[month] = (acc[month] || 0) + 1;
+        }
+        return acc;
+    }, {} as Record<string, number>);
+
+    const allMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentMonthIndex = new Date().getMonth();
+    const last6Months = Array.from({length: 6}, (_, i) => allMonths[(currentMonthIndex - 5 + i + 12) % 12]);
+    
+    return last6Months.map(month => ({
+      month,
+      reports: monthCounts[month] || 0,
+    }));
+  }, [reports]);
   
   return (
     <div className="space-y-8">
@@ -37,7 +78,6 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalReports}</div>
-            <p className="text-xs text-muted-foreground">+5 this month</p>
           </CardContent>
         </Card>
         <Card>
@@ -47,7 +87,6 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{pendingReports}</div>
-            <p className="text-xs text-muted-foreground">Highest priority items</p>
           </CardContent>
         </Card>
         <Card>
@@ -57,7 +96,6 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalReports - pendingReports}</div>
-            <p className="text-xs text-muted-foreground">Reviewed or actioned</p>
           </CardContent>
         </Card>
       </div>
@@ -68,34 +106,40 @@ export default function AdminPage() {
             <CardTitle>Recent Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Store</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockReports.slice(0, 5).map((report) => (
-                  <TableRow key={report.id}>
-                    <TableCell className="font-medium">{report.productName}</TableCell>
-                    <TableCell>{report.storeLocation}</TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        report.status === 'Pending' ? 'secondary' :
-                        report.status === 'Reviewed' ? 'outline' :
-                        'default'
-                      }>
-                        {report.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{format(new Date(report.submittedAt), "PPP")}</TableCell>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-48">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Store</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Date</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {reports?.slice(0, 5).map((report) => (
+                    <TableRow key={report.id}>
+                      <TableCell className="font-medium">{report.productName}</TableCell>
+                      <TableCell>{report.storeLocation}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          report.reportStatus === 'Pending' ? 'secondary' :
+                          report.reportStatus === 'Reviewed' ? 'outline' :
+                          'default'
+                        }>
+                          {report.reportStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{report.submissionDate ? format(report.submissionDate.toDate(), "PPP") : 'N/A'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
         
@@ -104,14 +148,20 @@ export default function AdminPage() {
                 <CardTitle>Reports by Month</CardTitle>
             </CardHeader>
             <CardContent>
-                <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                    <BarChart accessibilityLayer data={reportsByMonth}>
-                        <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                        <YAxis tickLine={false} axisLine={false} fontSize={12} />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                        <Bar dataKey="reports" fill="var(--color-reports)" radius={4} />
-                    </BarChart>
-                </ChartContainer>
+                {isLoading ? (
+                   <div className="flex justify-center items-center min-h-[200px]">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                   </div>
+                ) : (
+                  <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
+                      <BarChart accessibilityLayer data={reportsByMonth}>
+                          <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                          <YAxis tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
+                          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                          <Bar dataKey="reports" fill="var(--color-reports)" radius={4} />
+                      </BarChart>
+                  </ChartContainer>
+                )}
             </CardContent>
         </Card>
       </div>

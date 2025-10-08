@@ -6,10 +6,6 @@
       "type": "object",
       "description": "Represents a user-submitted report about a suspicious food expiry label.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the report."
-        },
         "productName": {
           "type": "string",
           "description": "The name of the product with the suspicious expiry label."
@@ -34,19 +30,23 @@
         },
         "reportStatus": {
           "type": "string",
-          "description": "The current status of the report (e.g., submitted, under review, action taken)."
+          "description": "The current status of the report (e.g., submitted, under review, action taken).",
+          "enum": [
+            "Pending",
+            "Reviewed",
+            "Action Taken"
+          ]
         },
         "userId": {
           "type": "string",
-          "description": "Reference to the User who submitted the report. (Relationship: User 1:N Report)"
+          "description": "Reference to the User who submitted the report."
         },
-        "analysisResultId": {
+        "analysisResult": {
           "type": "string",
-          "description": "Reference to the ImageAnalysisResult. (Relationship: ImageAnalysisResult 1:1 Report)"
+          "description": "The AI analysis result of the expiry label image."
         }
       },
       "required": [
-        "id",
         "productName",
         "labelDescription",
         "storeLocation",
@@ -54,7 +54,7 @@
         "submissionDate",
         "reportStatus",
         "userId",
-        "analysisResultId"
+        "analysisResult"
       ]
     },
     "User": {
@@ -65,70 +65,27 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the user."
+          "description": "Unique identifier for the user (UID from Firebase Auth)."
         },
         "email": {
           "type": "string",
-          "description": "The user's email address.",
+          "description": "The user's email address (if provided).",
           "format": "email"
-        },
-        "username": {
-          "type": "string",
-          "description": "The user's username."
         },
         "registrationDate": {
           "type": "string",
-          "description": "The date and time the user registered.",
+          "description": "The date and time the user first signed in.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
-        "email",
-        "username",
         "registrationDate"
-      ]
-    },
-    "ImageAnalysisResult": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ImageAnalysisResult",
-      "type": "object",
-      "description": "Represents the results of the AI image analysis for a given report.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the image analysis result."
-        },
-        "inconsistenciesFound": {
-          "type": "boolean",
-          "description": "Indicates whether any inconsistencies were found in the image."
-        },
-        "alterationsDetected": {
-          "type": "boolean",
-          "description": "Indicates whether any alterations or tampering were detected in the image."
-        },
-        "confidenceScore": {
-          "type": "number",
-          "description": "A score representing the confidence level of the analysis."
-        },
-        "analysisDate": {
-          "type": "string",
-          "description": "The date and time the image analysis was performed.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "inconsistenciesFound",
-        "alterationsDetected",
-        "confidenceScore",
-        "analysisDate"
       ]
     }
   },
   "auth": {
     "providers": [
-      "password",
       "anonymous"
     ]
   },
@@ -141,7 +98,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Collection of user profiles. User ID is used as the document ID.",
+          "description": "Collection of user profiles. User ID from Auth is used as the document ID.",
           "params": [
             {
               "name": "userId",
@@ -151,42 +108,21 @@
         }
       },
       {
-        "path": "/users/{userId}/reports/{reportId}",
+        "path": "/reports/{reportId}",
         "definition": {
           "entityName": "Report",
           "schema": {
             "$ref": "#/backend/entities/Report"
           },
-          "description": "Collection of reports submitted by a specific user. Path based ownership allows only the user to access the submitted reports",
+          "description": "Collection of all reports submitted by all users. Security rules will govern access.",
           "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
             {
               "name": "reportId",
               "description": "The unique identifier of the report."
             }
           ]
         }
-      },
-      {
-        "path": "/image_analysis_results/{analysisResultId}",
-        "definition": {
-          "entityName": "ImageAnalysisResult",
-          "schema": {
-            "$ref": "#/backend/entities/ImageAnalysisResult"
-          },
-          "description": "Collection storing results of image analysis. Report documents store the ID of the analysis result that applies to them.",
-          "params": [
-            {
-              "name": "analysisResultId",
-              "description": "The unique identifier of the image analysis result."
-            }
-          ]
-        }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the Shelf Watch application.  \n\n**Authorization Independence:** The design avoids hierarchical authorization dependencies by storing all data relevant to access control directly within the documents where it's needed. Specifically, access to reports is governed by the user who created them, establishing a simple, path-based ownership model. This eliminates the need for `get()` calls in security rules and supports atomic operations.\n\n**Structural Segregation:**  User-specific data (reports) is segregated under the `/users/{userId}/reports/{reportId}` path. This ensures that all documents within a collection share the same security requirements.\n\n**Access Modeling:** Path-based ownership is used for the reports.  The structure `/users/{userId}/reports/{reportId}` clearly establishes that a user owns the reports under their respective user ID.\n\n**QAPs (Rules are not Filters):** The structure facilitates secure `list` operations.  Listing reports is restricted to the user who owns the reports (path-based ownership). An admin interface to view all reports is not covered in the specified app requirements. If required, a separate collection for admin-accessible reports can be made.\n\n**Invariants:** The structure supports data integrity. Ownership of reports is explicit through the `/users/{userId}/reports/{reportId}` path. Timestamps (`submissionDate`, `analysisDate`) are stored directly within the documents, which simplifies maintaining data consistency and auditability."
+    ]
   }
 }

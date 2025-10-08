@@ -2,12 +2,17 @@
 
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
+import { collection, serverTimestamp } from 'firebase/firestore';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { initializeFirebase, addDocumentNonBlocking } from '@/firebase';
+import { revalidatePath } from 'next/cache';
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
   labelDescription: z.string().min(1, 'Description is required.'),
   storeLocation: z.string().min(1, 'Store location is required.'),
   photo: z.instanceof(File, { message: 'A photo is required.' }),
+  userId: z.string().min(1, 'User ID is required.'),
 });
 
 export type FormState = {
@@ -32,6 +37,7 @@ export async function submitReport(
     labelDescription: formData.get('labelDescription'),
     storeLocation: formData.get('storeLocation'),
     photo: formData.get('photo'),
+    userId: formData.get('userId'),
   });
 
   if (!validatedFields.success) {
@@ -42,7 +48,7 @@ export async function submitReport(
     };
   }
   
-  const { photo } = validatedFields.data;
+  const { photo, productName, storeLocation, labelDescription, userId } = validatedFields.data;
 
   if (photo.size === 0) {
     return {
@@ -52,22 +58,43 @@ export async function submitReport(
   }
   
   try {
+    const { firestore, firebaseApp } = initializeFirebase();
+    const storage = getStorage(firebaseApp);
+
     const photoDataUri = await fileToDataUri(photo);
 
-    const result = await analyzeExpiryLabelImage({ photoDataUri });
+    const analysisResult = await analyzeExpiryLabelImage({ photoDataUri });
 
-    // In a real app, you would save the report and analysis to a database here.
+    // Upload image to Firebase Storage
+    const storageRef = ref(storage, `reports/${Date.now()}-${photo.name}`);
+    const uploadResult = await uploadString(storageRef, photoDataUri, 'data_url');
+    const photoUrl = await getDownloadURL(uploadResult.ref);
+
+    // Save report to Firestore
+    const reportsCollection = collection(firestore, 'reports');
+    addDocumentNonBlocking(reportsCollection, {
+        productName,
+        storeLocation,
+        labelDescription,
+        userId,
+        photoUrl,
+        analysisResult: analysisResult.analysisResult,
+        reportStatus: "Pending",
+        submissionDate: serverTimestamp(),
+    });
+    
+    revalidatePath('/admin');
     
     return {
       message: 'Report submitted successfully. See analysis below.',
-      analysis: result.analysisResult,
+      analysis: analysisResult.analysisResult,
       error: false,
     };
   } catch (e) {
     console.error(e);
     const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
     return {
-      message: `An error occurred during image analysis: ${errorMessage}`,
+      message: `An error occurred: ${errorMessage}`,
       error: true,
     };
   }
