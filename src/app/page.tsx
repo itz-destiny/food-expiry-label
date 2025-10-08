@@ -1,6 +1,7 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { submitReport } from '@/app/actions';
 
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Loader2, Package, ScanSearch, Store } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
@@ -27,7 +27,7 @@ function SubmitButton() {
 
 export default function Home() {
   const initialState = { message: '', error: false };
-  const [state, dispatch] = useFormState(submitReport, initialState);
+  const [state, dispatch] = useActionState(submitReport, initialState);
   const [preview, setPreview] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
