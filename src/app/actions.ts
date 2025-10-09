@@ -32,6 +32,14 @@ export async function submitReport(
   prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
+  // Increase timeout to 60 seconds
+  // This is a Next.js-specific configuration
+  if (typeof (globalThis as any).requestConfigRegistry === 'object') {
+    (globalThis as any).requestConfigRegistry.set(submitReport, {
+      maxDuration: 60,
+    });
+  }
+
   const validatedFields = FormSchema.safeParse({
     productName: formData.get('productName'),
     labelDescription: formData.get('labelDescription'),
