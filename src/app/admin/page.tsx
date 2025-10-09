@@ -10,7 +10,7 @@ import {
   ChartTooltipContent,
   type ChartConfig
 } from "@/components/ui/chart";
-import { Bar, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Bar, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
@@ -43,7 +43,7 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-4xl font-headline font-bold">Admin Dashboard</h1>
+      <h1 className="text-3xl md:text-4xl font-headline font-bold">Admin Dashboard</h1>
 
       <Alert>
           <Info className="h-4 w-4" />
@@ -126,14 +126,12 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
                   <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart accessibilityLayer data={mockReportsByMonth}>
-                            <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                            <YAxis tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
-                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                            <Bar dataKey="reports" fill="var(--color-reports)" radius={4} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                    <BarChart accessibilityLayer data={mockReportsByMonth}>
+                        <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                        <YAxis tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                        <Bar dataKey="reports" fill="var(--color-reports)" radius={4} />
+                    </BarChart>
                   </ChartContainer>
             </CardContent>
         </Card>
