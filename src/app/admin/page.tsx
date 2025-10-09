@@ -3,28 +3,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { BarChart, FileWarning, ListChecks, Hourglass, Loader2 } from "lucide-react";
+import { BarChart, FileWarning, ListChecks, Hourglass, Info } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig
 } from "@/components/ui/chart";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { useMemo } from "react";
-import { collection, query, orderBy, Timestamp } from "firebase/firestore";
 import { Bar, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-
-export type Report = {
-  id: string;
-  productName: string;
-  storeLocation: string;
-  submissionDate: Timestamp;
-  reportStatus: "Pending" | "Reviewed" | "Action Taken";
-  analysisResult: string;
-};
 
 const chartConfig = {
   reports: {
@@ -33,42 +21,37 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+// Mock data for demonstration purposes
+const mockReports = [
+  { id: '1', productName: 'Organic Milk', storeLocation: 'Main St. Grocer', reportStatus: 'Pending', submissionDate: '2024-07-20' },
+  { id: '2', productName: 'Cheddar Cheese', storeLocation: 'Downtown Market', reportStatus: 'Reviewed', submissionDate: '2024-07-19' },
+  { id: '3', productName: 'Artisan Bread', storeLocation: 'Corner Bakery', reportStatus: 'Action Taken', submissionDate: '2024-07-18' },
+];
+
+const mockReportsByMonth = [
+    { month: 'Feb', reports: 5 },
+    { month: 'Mar', reports: 8 },
+    { month: 'Apr', reports: 12 },
+    { month: 'May', reports: 15 },
+    { month: 'Jun', reports: 10 },
+    { month: 'Jul', reports: 18 },
+];
+
 export default function AdminPage() {
-  const firestore = useFirestore();
-  
-  const reportsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'reports'), orderBy('submissionDate', 'desc'));
-  }, [firestore]);
+  const totalReports = mockReports.length;
+  const pendingReports = mockReports.filter(r => r.reportStatus === 'Pending').length;
 
-  const { data: reports, isLoading } = useCollection<Report>(reportsQuery);
-  
-  const totalReports = reports?.length ?? 0;
-  const pendingReports = reports?.filter(r => r.reportStatus === 'Pending').length ?? 0;
-
-  const reportsByMonth = useMemo(() => {
-    if (!reports) return [];
-    const monthCounts = reports.reduce((acc, report) => {
-        if (report.submissionDate) {
-            const month = format(report.submissionDate.toDate(), "MMM");
-            acc[month] = (acc[month] || 0) + 1;
-        }
-        return acc;
-    }, {} as Record<string, number>);
-
-    const allMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const currentMonthIndex = new Date().getMonth();
-    const last6Months = Array.from({length: 6}, (_, i) => allMonths[(currentMonthIndex - 5 + i + 12) % 12]);
-    
-    return last6Months.map(month => ({
-      month,
-      reports: monthCounts[month] || 0,
-    }));
-  }, [reports]);
-  
   return (
     <div className="space-y-8">
       <h1 className="text-4xl font-headline font-bold">Admin Dashboard</h1>
+
+      <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Viewing Sample Data</AlertTitle>
+          <AlertDescription>
+            The database is not connected. This page is currently displaying static sample data for demonstration purposes.
+          </AlertDescription>
+      </Alert>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
@@ -106,11 +89,6 @@ export default function AdminPage() {
             <CardTitle>Recent Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center items-center h-48">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -121,7 +99,7 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reports?.slice(0, 5).map((report) => (
+                  {mockReports.map((report) => (
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">{report.productName}</TableCell>
                       <TableCell>{report.storeLocation}</TableCell>
@@ -134,12 +112,11 @@ export default function AdminPage() {
                           {report.reportStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{report.submissionDate ? format(report.submissionDate.toDate(), "PPP") : 'N/A'}</TableCell>
+                      <TableCell className="text-right">{report.submissionDate}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            )}
           </CardContent>
         </Card>
         
@@ -148,20 +125,16 @@ export default function AdminPage() {
                 <CardTitle>Reports by Month</CardTitle>
             </CardHeader>
             <CardContent>
-                {isLoading ? (
-                   <div className="flex justify-center items-center min-h-[200px]">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                   </div>
-                ) : (
                   <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                      <BarChart accessibilityLayer data={reportsByMonth}>
-                          <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                          <YAxis tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
-                          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                          <Bar dataKey="reports" fill="var(--color-reports)" radius={4} />
-                      </BarChart>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart accessibilityLayer data={mockReportsByMonth}>
+                            <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                            <YAxis tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
+                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                            <Bar dataKey="reports" fill="var(--color-reports)" radius={4} />
+                        </BarChart>
+                      </ResponsiveContainer>
                   </ChartContainer>
-                )}
             </CardContent>
         </Card>
       </div>

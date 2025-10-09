@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { submitReportAction, type SubmitReportResponse } from '@/app/actions';
-import { useAuth, useUser, initiateAnonymousSignIn } from '@/firebase';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,9 +15,8 @@ import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 function SubmitButton({ isPending }: { isPending: boolean }) {
-  const { user } = useUser();
   return (
-    <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isPending || !user} size="lg">
+    <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isPending} size="lg">
       {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2" />}
       Analyze and Submit Report
     </Button>
@@ -34,15 +32,6 @@ export default function Home() {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const heroImage = PlaceHolderImages.find(img => img.id === 'hero-image');
-
-  const auth = useAuth();
-  const { user, isUserLoading } = useUser();
-
-  useEffect(() => {
-    if (!isUserLoading && !user && auth) {
-      initiateAnonymousSignIn(auth);
-    }
-  }, [isUserLoading, user, auth]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,12 +76,7 @@ export default function Home() {
       reader.readAsDataURL(photoFile);
       reader.onloadend = async () => {
         const photoDataUri = reader.result as string;
-        const payload = {
-          ...data,
-          photoDataUri,
-          photoType: photoFile.type,
-          photoName: photoFile.name,
-        };
+        const payload = { ...data, photoDataUri };
         const result = await submitReportAction(payload);
         setState(result);
       };
@@ -134,7 +118,6 @@ export default function Home() {
                 <CardDescription>Fill out the details below. All fields are required.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                 {user && <input type="hidden" name="userId" value={user.uid} />}
                 <div className="space-y-2">
                   <Label htmlFor="productName">Product Name</Label>
                   <div className="relative">
@@ -181,7 +164,7 @@ export default function Home() {
           {state && (
             <Alert variant={state.error ? 'destructive' : 'default'} className={cn(!state.error && "bg-accent/50 border-accent")}>
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>{state.error ? 'Error' : 'Submission Received'}</AlertTitle>
+              <AlertTitle>{state.error ? 'Error' : 'Analysis Complete'}</AlertTitle>
               <AlertDescription>{state.message}</AlertDescription>
             </Alert>
           )}
