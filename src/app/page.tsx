@@ -1,8 +1,7 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
-import { useFormStatus } from 'react-dom';
-import { submitReport } from '@/app/actions';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { submitReportAction, type SubmitReportResponse } from '@/app/actions';
 import { useAuth, useUser, initiateAnonymousSignIn } from '@/firebase';
 
 import { Button } from '@/components/ui/button';
@@ -16,21 +15,22 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ isPending }: { isPending: boolean }) {
   const { user } = useUser();
   return (
-    <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={pending || !user} size="lg">
-      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2" />}
+    <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isPending || !user} size="lg">
+      {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2" />}
       Analyze and Submit Report
     </Button>
   );
 }
 
 export default function Home() {
-  const initialState = { message: '', error: false };
-  const [state, dispatch] = useActionState(submitReport, initialState);
+  const [state, setState] = useState<SubmitReportResponse | null>(null);
+  const [isPending, startTransition] = useTransition();
+
   const [preview, setPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const heroImage = PlaceHolderImages.find(img => img.id === 'hero-image');
@@ -47,25 +47,61 @@ export default function Home() {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     } else {
+      setPhotoFile(null);
       setPreview(null);
     }
   };
 
   useEffect(() => {
-    if (state.message && !state.error) {
+    if (state && !state.error) {
       formRef.current?.reset();
       setPreview(null);
+      setPhotoFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   }, [state]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setState(null);
+
+    const formData = new FormData(event.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+
+    if (!photoFile) {
+        setState({ message: 'A photo is required.', error: true });
+        return;
+    }
+
+    startTransition(async () => {
+      const reader = new FileReader();
+      reader.readAsDataURL(photoFile);
+      reader.onloadend = async () => {
+        const photoDataUri = reader.result as string;
+        const payload = {
+          ...data,
+          photoDataUri,
+          photoType: photoFile.type,
+          photoName: photoFile.name,
+        };
+        const result = await submitReportAction(payload);
+        setState(result);
+      };
+      reader.onerror = () => {
+        setState({ message: 'Failed to read the image file.', error: true });
+      }
+    });
+  };
+
 
   return (
     <div className="space-y-8">
@@ -92,7 +128,7 @@ export default function Home() {
       <div className="grid md:grid-cols-5 gap-8 items-start">
         <div className="md:col-span-3">
           <Card>
-            <form action={dispatch} ref={formRef}>
+            <form onSubmit={handleSubmit} ref={formRef}>
               <CardHeader>
                 <CardTitle>Submit a New Report</CardTitle>
                 <CardDescription>Fill out the details below. All fields are required.</CardDescription>
@@ -128,7 +164,7 @@ export default function Home() {
                 </div>
               </CardContent>
               <CardFooter>
-                <SubmitButton />
+                <SubmitButton isPending={isPending} />
               </CardFooter>
             </form>
           </Card>
@@ -136,14 +172,20 @@ export default function Home() {
 
         <div className="md:col-span-2 sticky top-24 space-y-6">
           <h2 className="text-3xl font-headline font-bold">Analysis Result</h2>
-          {state.message && (
+          {isPending && !state && (
+             <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg min-h-[300px]">
+                <Loader2 className="h-16 w-16 mb-4 animate-spin text-muted-foreground/30" />
+                <p>Analyzing... please wait.</p>
+              </div>
+          )}
+          {state && (
             <Alert variant={state.error ? 'destructive' : 'default'} className={cn(!state.error && "bg-accent/50 border-accent")}>
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>{state.error ? 'Error' : 'Submission Received'}</AlertTitle>
               <AlertDescription>{state.message}</AlertDescription>
             </Alert>
           )}
-          {state.analysis ? (
+          {state?.analysis ? (
             <Card className="animate-in fade-in-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -156,10 +198,12 @@ export default function Home() {
               </CardContent>
             </Card>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg min-h-[300px]">
-              <ScanSearch className="h-16 w-16 mb-4 text-muted-foreground/30" />
-              <p>The analysis of your submitted image will appear here after you submit a report.</p>
-            </div>
+            !isPending && (
+              <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg min-h-[300px]">
+                <ScanSearch className="h-16 w-16 mb-4 text-muted-foreground/30" />
+                <p>The analysis of your submitted image will appear here after you submit a report.</p>
+              </div>
+            )
           )}
         </div>
       </div>
