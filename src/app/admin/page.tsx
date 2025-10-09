@@ -3,14 +3,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, FileWarning, ListChecks, Hourglass, Info } from "lucide-react";
+import { FileWarning, ListChecks, Hourglass, Info } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig
 } from "@/components/ui/chart";
-import { Bar, XAxis, YAxis } from "recharts";
+import { BarChart, Bar, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
