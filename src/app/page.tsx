@@ -81,7 +81,7 @@ export default function Home() {
           />
           <div className="absolute inset-0 bg-black/40" />
           <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white p-4">
-            <h1 className="text-4xl md:text-6xl font-headline font-black uppercase tracking-wider">Label Guard</h1>
+            <h1 className="text-4xl md:text-6xl font-headline font-black uppercase tracking-wider">Food Expiry Alert</h1>
             <p className="text-lg md:text-xl max-w-3xl mt-4">
               Your eyes on expiry dates. Report suspicious food labels and help ensure community food safety.
             </p>

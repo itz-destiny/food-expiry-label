@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'Label Guard',
+  title: 'Food Expiry Alert',
   description: 'A web based interface for consumer feedback on suspicious food expiry labels',
 };
 

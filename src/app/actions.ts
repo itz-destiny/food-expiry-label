@@ -2,10 +2,18 @@
 
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
-import { collection, serverTimestamp } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { initializeFirebase, addDocumentNonBlocking } from '@/firebase';
+import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
+
+// Initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp({
+    storageBucket: `${process.env.GCLOUD_PROJECT}.appspot.com`,
+  });
+}
+
+const firestore = admin.firestore();
+const storage = admin.storage().bucket();
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
@@ -66,21 +74,27 @@ export async function submitReport(
   }
   
   try {
-    const { firestore, firebaseApp } = initializeFirebase();
-    const storage = getStorage(firebaseApp);
-
     const photoDataUri = await fileToDataUri(photo);
-
+    
+    // Perform AI analysis
     const analysisResult = await analyzeExpiryLabelImage({ photoDataUri });
 
     // Upload image to Firebase Storage
-    const storageRef = ref(storage, `reports/${Date.now()}-${photo.name}`);
-    const uploadResult = await uploadString(storageRef, photoDataUri, 'data_url');
-    const photoUrl = await getDownloadURL(uploadResult.ref);
-
+    const fileName = `reports/${Date.now()}-${photo.name}`;
+    const file = storage.file(fileName);
+    const buffer = Buffer.from(photoDataUri.split(',')[1], 'base64');
+    
+    await file.save(buffer, {
+        metadata: { contentType: photo.type }
+    });
+    
+    const [photoUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: '03-09-2491' // A very long expiry date
+    });
+    
     // Save report to Firestore
-    const reportsCollection = collection(firestore, 'reports');
-    addDocumentNonBlocking(reportsCollection, {
+    await firestore.collection('reports').add({
         productName,
         storeLocation,
         labelDescription,
@@ -88,7 +102,7 @@ export async function submitReport(
         photoUrl,
         analysisResult: analysisResult.analysisResult,
         reportStatus: "Pending",
-        submissionDate: serverTimestamp(),
+        submissionDate: admin.firestore.FieldValue.serverTimestamp(),
     });
     
     revalidatePath('/admin');
