@@ -90,7 +90,7 @@ export default function Home() {
   return (
     <div className="space-y-8">
       {heroImage && (
-        <div className="relative w-full h-[400px] rounded-xl overflow-hidden group shadow-lg">
+        <div className="relative w-full h-[300px] md:h-[400px] rounded-xl overflow-hidden group shadow-lg">
           <Image
             src={heroImage.imageUrl}
             alt={heroImage.description}
@@ -101,16 +101,16 @@ export default function Home() {
           />
           <div className="absolute inset-0 bg-black/40" />
           <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white p-4">
-            <h1 className="text-4xl md:text-6xl font-headline font-black uppercase tracking-wider">Food Expiry Alert</h1>
-            <p className="text-lg md:text-xl max-w-3xl mt-4">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-headline font-black uppercase tracking-wider">Food Expiry Alert</h1>
+            <p className="text-base sm:text-lg md:text-xl max-w-3xl mt-4">
               Your eyes on expiry dates. Report suspicious food labels and help ensure community food safety.
             </p>
           </div>
         </div>
       )}
       
-      <div className="grid md:grid-cols-5 gap-8 items-start">
-        <div className="md:col-span-3">
+      <div className="grid lg:grid-cols-5 gap-8 items-start">
+        <div className="lg:col-span-3">
           <Card>
             <form onSubmit={handleSubmit} ref={formRef}>
               <CardHeader>
@@ -153,7 +153,7 @@ export default function Home() {
           </Card>
         </div>
 
-        <div className="md:col-span-2 sticky top-24 space-y-6">
+        <div className="lg:col-span-2 lg:sticky top-24 space-y-6">
           <h2 className="text-3xl font-headline font-bold">Analysis Result</h2>
           {isPending && !state && (
              <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg min-h-[300px]">
