@@ -6,7 +6,7 @@ import { firebaseConfig } from './config';
 export function initializeAdminFirebase() {
   if (!getApps().length) {
     initializeApp({
-        credential: undefined, // Use Application Default Credentials
+        // By not providing a credential, the SDK will use Application Default Credentials.
         projectId: firebaseConfig.projectId,
     });
   }
