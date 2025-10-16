@@ -2,10 +2,8 @@
 
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
-import { getFirestore, collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
-
-export const maxDuration = 60; // Increase timeout to 60 seconds
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
@@ -24,6 +22,8 @@ export type SubmitReportResponse = {
 export async function submitReportAction(
   data: unknown
 ): Promise<SubmitReportResponse> {
+  const maxDuration = 60; // Increase timeout to 60 seconds
+
   const validatedFields = FormSchema.safeParse(data);
 
   if (!validatedFields.success) {

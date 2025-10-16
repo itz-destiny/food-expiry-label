@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useUser } from '@/firebase';
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function SubmitButton({ isPending }: { isPending: boolean }) {
   return (
