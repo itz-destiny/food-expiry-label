@@ -1,107 +1,67 @@
 /**
- * @fileoverview Firestore Security Rules for the Shelf Watch application.
+ * @file Firebase Security Rules for Shelf Watch Firestore database.
  *
  * Core Philosophy:
- * This ruleset enforces a user-ownership model for reports, where each user can only access their own reports.
- * Image analysis results are publicly accessible but not modifiable. User profiles are private to the respective user.
+ * This ruleset prioritizes user data ownership and restricts broad access. User documents are private, while submitted reports have public read access but owner-only write access.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile data. Only the user can read/write their own profile.
- * - /users/{userId}/reports/{reportId}: Stores reports submitted by a specific user. Only the user can read/write their own reports.
- * - /image_analysis_results/{analysisResultId}: Stores the results of image analysis. These are publicly readable, but writes are not allowed in this ruleset.
+ * - /users/{userId}: Stores individual user profiles, accessible only to the user themselves.
+ * - /reports/{reportId}: Stores user-submitted reports. Anyone can read these reports, but only the submitting user can create, update, or delete them.
  *
  * Key Security Decisions:
- * - Users can only manage their own profiles and reports.
- * - Image analysis results are publicly readable, assuming an external process manages their creation.
- * - Listing all users is disallowed.
- *
- * Denormalization for Authorization:
- * - Reports are stored under the /users/{userId} path, denormalizing the userId into the path itself for easy authorization.
- *   This avoids the need to read the user document to verify ownership.
+ * - User listing is disallowed to prevent enumeration.
+ * - Reports are publicly readable to facilitate data analysis and community review.
+ * - Owner-only writes are enforced using the 'userId' field within the report documents.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Defines if the current user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Defines if the current user is the owner of the resource based on the userId.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Defines if the current user is the owner of an existing resource.
-     * @details Combines the ownership check with the existence check to prevent operations on non-existent documents.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /***************** User Rules *****************/
-
-    /**
-     * @description Controls access to user profile documents.
+     * @description Rules for user profiles. Only the user can read and write their own profile.
      * @path /users/{userId}
-     * @allow (create) - User with ID 'user123' can create their own profile document.
-     * @allow (get) - User with ID 'user123' can read their own profile document.
-     * @allow (update) - User with ID 'user123' can update their own profile document.
-     * @allow (delete) - User with ID 'user123' can delete their own profile document.
-     * @deny (create) - User with ID 'user456' cannot create a profile document for 'user123'.
-     * @deny (get) - User with ID 'user456' cannot read the profile document of 'user123'.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can create their own profile.
+     * @deny (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' cannot create a profile with a different ID.
+     * @allow (get, update, delete) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can get, update, and delete their own profile.
+     * @deny (get, update, delete) User with ID 'otherUserId' cannot get, update, or delete the profile of user 'hMl8yLyoALh9kogR4OFwFxUpGPa2'.
+     * @principle Enforces user ownership for all operations on user profiles.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) && resource.data.id == userId;
       allow delete: if isExistingOwner(userId);
     }
 
-    /***************** Report Rules *****************/
-
     /**
-     * @description Controls access to report documents submitted by a user.
-     * @path /users/{userId}/reports/{reportId}
-     * @allow (create) - User with ID 'user123' can create a report under their user ID.
-     * @allow (get) - User with ID 'user123' can read a report under their user ID.
-     * @allow (update) - User with ID 'user123' can update a report under their user ID.
-     * @allow (delete) - User with ID 'user123' can delete a report under their user ID.
-     * @deny (create) - User with ID 'user456' cannot create a report under the user ID 'user123'.
-     * @deny (get) - User with ID 'user456' cannot read a report under the user ID 'user123'.
-     * @principle Enforces document ownership for reports.
+     * @description Rules for reports. Anyone can read reports, but only the owner can create, update, or delete.
+     * @path /reports/{reportId}
+     * @allow (get, list) Any user can read (get, list) any report.
+     * @allow (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can create a report with their user ID.
+     * @deny (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' cannot create a report with a different user ID.
+     * @allow (update, delete) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can update and delete their own report.
+     * @deny (update, delete) User with ID 'otherUserId' cannot update or delete the report of user 'hMl8yLyoALh9kogR4OFwFxUpGPa2'.
+     * @principle Allows public read access for reports while enforcing owner-only write access.
      */
-    match /users/{userId}/reports/{reportId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
+    match /reports/{reportId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(resource.data.userId) && resource.data.userId == request.auth.uid;
+      allow delete: if isExistingOwner(resource.data.userId) && resource.data.userId == request.auth.uid;
     }
+  }
 
-    /***************** Image Analysis Result Rules *****************/
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
-    /**
-     * @description Controls access to image analysis result documents.  These are publicly readable.
-     * @path /image_analysis_results/{analysisResultId}
-     * @allow (get) - Any user can read an image analysis result.
-     * @deny (create) - No user can create an image analysis result via the client.
-     * @principle Allows public read access to image analysis results.
-     */
-    match /image_analysis_results/{analysisResultId} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
