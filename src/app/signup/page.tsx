@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -40,6 +41,9 @@ export default function SignUpPage() {
     setError(null);
 
     try {
+      if (!firestore || !auth) {
+        throw new Error('Firebase services are not available.');
+      }
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
@@ -90,9 +94,9 @@ export default function SignUpPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label_>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-12 h-5 w-5 text-muted-foreground" />
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                         id="password"
                         type="password"
