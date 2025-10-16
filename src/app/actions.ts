@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
 import { collection, addDoc } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
+import { initializeAdminFirebase } from '@/firebase/admin';
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
@@ -37,7 +37,7 @@ export async function submitReportAction(
   const { photoDataUri, ...reportData } = validatedFields.data;
 
   try {
-    const { firestore } = initializeFirebase();
+    const { firestore } = initializeAdminFirebase();
     // Perform AI analysis
     const analysisResult = await analyzeExpiryLabelImage({ photoDataUri });
 
