@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Loader2, Package, ScanSearch, Store } from 'lucide-react';
+import { AlertTriangle, Loader2, Package, ScanSearch, Store, UserX } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useUser } from '@/firebase';
+import Link from 'next/link';
 
 function SubmitButton({ isPending }: { isPending: boolean }) {
   return (
@@ -21,6 +23,27 @@ function SubmitButton({ isPending }: { isPending: boolean }) {
       Analyze and Submit Report
     </Button>
   );
+}
+
+function LoggedOutWarning() {
+    return (
+        <Card className="lg:col-span-3">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><UserX /> Please Log In</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+                <p>You must be logged in to submit a report.</p>
+                <div className="flex gap-4 justify-center">
+                    <Button asChild>
+                        <Link href="/login">Login</Link>
+                    </Button>
+                    <Button asChild variant="secondary">
+                        <Link href="/signup">Sign Up</Link>
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    )
 }
 
 export default function Home() {
@@ -32,6 +55,8 @@ export default function Home() {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const heroImage = PlaceHolderImages.find(img => img.id === 'hero-image');
+
+  const { user, isUserLoading } = useUser();
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,6 +86,11 @@ export default function Home() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!user) {
+        setState({ message: 'You must be logged in to submit a report.', error: true });
+        return;
+    }
+
     setState(null);
 
     const formData = new FormData(event.currentTarget);
@@ -76,7 +106,7 @@ export default function Home() {
       reader.readAsDataURL(photoFile);
       reader.onloadend = async () => {
         const photoDataUri = reader.result as string;
-        const payload = { ...data, photoDataUri };
+        const payload = { ...data, photoDataUri, userId: user.uid };
         const result = await submitReportAction(payload);
         setState(result);
       };
@@ -110,48 +140,57 @@ export default function Home() {
       )}
       
       <div className="grid lg:grid-cols-5 gap-8 items-start">
-        <div className="lg:col-span-3">
-          <Card>
-            <form onSubmit={handleSubmit} ref={formRef}>
-              <CardHeader>
-                <CardTitle>Submit a New Report</CardTitle>
-                <CardDescription>Fill out the details below. All fields are required.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="productName">Product Name</Label>
-                  <div className="relative">
-                    <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input id="productName" name="productName" placeholder="e.g., Organic Milk, 1 Gallon" className="pl-10" required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="storeLocation">Store Location</Label>
-                  <div className="relative">
-                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input id="storeLocation" name="storeLocation" placeholder="e.g., Main St. Grocer, Aisle 4" className="pl-10" required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="labelDescription">Description of Suspicion</Label>
-                  <Textarea id="labelDescription" name="labelDescription" placeholder="e.g., The expiry date seems to be printed over an old one..." required rows={4} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="photo">Upload Photo of Label</Label>
-                  <Input id="photo" name="photo" type="file" accept="image/*" onChange={handlePhotoChange} ref={fileInputRef} required />
-                  {preview && (
-                    <div className="mt-4 relative w-full aspect-video rounded-md overflow-hidden border-2 border-dashed">
-                      <Image src={preview} alt="Label preview" fill className="object-contain" />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <SubmitButton isPending={isPending} />
-              </CardFooter>
-            </form>
-          </Card>
-        </div>
+        { isUserLoading ? (
+            <div className="lg:col-span-3">
+                <Skeleton className="h-[650px] w-full" />
+            </div>
+        ) : user ? (
+            <div className="lg:col-span-3">
+                <Card>
+                    <form onSubmit={handleSubmit} ref={formRef}>
+                    <CardHeader>
+                        <CardTitle>Submit a New Report</CardTitle>
+                        <CardDescription>Fill out the details below. All fields are required.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                        <Label htmlFor="productName">Product Name</Label>
+                        <div className="relative">
+                            <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input id="productName" name="productName" placeholder="e.g., Organic Milk, 1 Gallon" className="pl-10" required />
+                        </div>
+                        </div>
+                        <div className="space-y-2">
+                        <Label htmlFor="storeLocation">Store Location</Label>
+                        <div className="relative">
+                            <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input id="storeLocation" name="storeLocation" placeholder="e.g., Main St. Grocer, Aisle 4" className="pl-10" required />
+                        </div>
+                        </div>
+                        <div className="space-y-2">
+                        <Label htmlFor="labelDescription">Description of Suspicion</Label>
+                        <Textarea id="labelDescription" name="labelDescription" placeholder="e.g., The expiry date seems to be printed over an old one..." required rows={4} />
+                        </div>
+                        <div className="space-y-2">
+                        <Label htmlFor="photo">Upload Photo of Label</Label>
+                        <Input id="photo" name="photo" type="file" accept="image/*" onChange={handlePhotoChange} ref={fileInputRef} required />
+                        {preview && (
+                            <div className="mt-4 relative w-full aspect-video rounded-md overflow-hidden border-2 border-dashed">
+                            <Image src={preview} alt="Label preview" fill className="object-contain" />
+                            </div>
+                        )}
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                        <SubmitButton isPending={isPending} />
+                    </CardFooter>
+                    </form>
+                </Card>
+            </div>
+        ) : (
+            <LoggedOutWarning />
+        )}
+
 
         <div className="lg:col-span-2 lg:sticky top-24 space-y-6">
           <h2 className="text-3xl font-headline font-bold">Analysis Result</h2>

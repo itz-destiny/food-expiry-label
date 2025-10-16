@@ -1,9 +1,10 @@
 'use client'
 
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileWarning, ListChecks, Hourglass, Info } from "lucide-react";
+import { FileWarning, ListChecks, Hourglass, Info, LogIn } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -12,7 +13,13 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
+import { useCollection, useUser, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { format } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 const chartConfig = {
   reports: {
@@ -21,37 +28,100 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-// Mock data for demonstration purposes
-const mockReports = [
-  { id: '1', productName: 'Organic Milk', storeLocation: 'Main St. Grocer', reportStatus: 'Pending', submissionDate: '2024-07-20' },
-  { id: '2', productName: 'Cheddar Cheese', storeLocation: 'Downtown Market', reportStatus: 'Reviewed', submissionDate: '2024-07-19' },
-  { id: '3', productName: 'Artisan Bread', storeLocation: 'Corner Bakery', reportStatus: 'Action Taken', submissionDate: '2024-07-18' },
-];
+// Define the structure of a report document from Firestore
+interface Report {
+  id: string;
+  productName: string;
+  storeLocation: string;
+  reportStatus: 'Pending' | 'Reviewed' | 'Action Taken';
+  submissionDate: string; // ISO string
+}
 
-const mockReportsByMonth = [
-    { month: 'Feb', reports: 5 },
-    { month: 'Mar', reports: 8 },
-    { month: 'Apr', reports: 12 },
-    { month: 'May', reports: 15 },
-    { month: 'Jun', reports: 10 },
-    { month: 'Jul', reports: 18 },
-];
+function AdminDashboardContent() {
+  const firestore = useFirestore();
 
-export default function AdminPage() {
-  const totalReports = mockReports.length;
-  const pendingReports = mockReports.filter(r => r.reportStatus === 'Pending').length;
+  // Memoize the query to prevent re-renders
+  const reportsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'reports'), orderBy('submissionDate', 'desc'));
+  }, [firestore]);
+
+  const { data: reports, isLoading, error } = useCollection<Report>(reportsQuery);
+
+  const reportsByMonth = useMemo(() => {
+    if (!reports) return [];
+    const monthlyCounts = new Map<string, number>();
+
+    reports.forEach(report => {
+      const month = format(new Date(report.submissionDate), 'MMM');
+      monthlyCounts.set(month, (monthlyCounts.get(month) || 0) + 1);
+    });
+    
+    const sortedMonths = Array.from(monthlyCounts.keys()).sort((a,b) => new Date(`1970-01-01T00:00:00Z`).getMonth() - new Date(`${a} 1, 1970`).getMonth());
+
+    // Create a list of the last 6 months for the chart
+    const last6Months = [];
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      last6Months.push(format(d, 'MMM'));
+    }
+
+    return last6Months.map(month => ({
+      month,
+      reports: monthlyCounts.get(month) || 0,
+    }));
+
+  }, [reports]);
+
+  const totalReports = reports?.length ?? 0;
+  const pendingReports = reports?.filter(r => r.reportStatus === 'Pending').length ?? 0;
+  const resolvedReports = totalReports - pendingReports;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <h1 className="text-3xl md:text-4xl font-headline font-bold">Admin Dashboard</h1>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Skeleton className="h-[109px]" />
+            <Skeleton className="h-[109px]" />
+            <Skeleton className="h-[109px]" />
+        </div>
+         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Skeleton className="lg:col-span-4 h-[400px]" />
+            <Skeleton className="lg:col-span-3 h-[400px]" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+        <Alert variant="destructive">
+            <FileWarning className="h-4 w-4" />
+            <AlertTitle>Error Loading Reports</AlertTitle>
+            <AlertDescription>
+                Could not load reports from the database. Please check your connection or permissions.
+                <pre className="mt-2 text-xs">{error.message}</pre>
+            </AlertDescription>
+        </Alert>
+    );
+  }
 
   return (
     <div className="space-y-8">
       <h1 className="text-3xl md:text-4xl font-headline font-bold">Admin Dashboard</h1>
 
-      <Alert>
+      {reports === null && !isLoading && (
+        <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Viewing Sample Data</AlertTitle>
+          <AlertTitle>No Data Yet</AlertTitle>
           <AlertDescription>
-            The database is not connected. This page is currently displaying static sample data for demonstration purposes.
+            The database is connected, but no reports have been submitted yet. Once reports are submitted, they will appear here.
           </AlertDescription>
-      </Alert>
+        </Alert>
+      )}
+
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
@@ -78,7 +148,7 @@ export default function AdminPage() {
             <ListChecks className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalReports - pendingReports}</div>
+            <div className="text-2xl font-bold">{resolvedReports}</div>
           </CardContent>
         </Card>
       </div>
@@ -99,7 +169,7 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockReports.map((report) => (
+                  {reports && reports.slice(0, 5).map((report) => (
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">{report.productName}</TableCell>
                       <TableCell>{report.storeLocation}</TableCell>
@@ -112,7 +182,7 @@ export default function AdminPage() {
                           {report.reportStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{report.submissionDate}</TableCell>
+                      <TableCell className="text-right">{format(new Date(report.submissionDate), 'yyyy-MM-dd')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -126,7 +196,7 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
                   <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                    <BarChart accessibilityLayer data={mockReportsByMonth}>
+                    <BarChart accessibilityLayer data={reportsByMonth}>
                         <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
                         <YAxis tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
@@ -138,4 +208,42 @@ export default function AdminPage() {
       </div>
     </div>
   );
+}
+
+
+export default function AdminPage() {
+    const { user, isUserLoading } = useUser();
+
+    if (isUserLoading) {
+        return (
+             <div className="flex items-center justify-center h-full">
+                <Hourglass className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
+
+    if (!user) {
+        return (
+            <div className="flex flex-col items-center justify-center text-center h-full">
+                <div className="max-w-md mx-auto">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Access Restricted</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p>You must be logged in to view the admin dashboard.</p>
+                            <Button asChild className="w-full">
+                                <Link href="/login">
+                                    <LogIn className="mr-2" />
+                                    Login
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        )
+    }
+
+    return <AdminDashboardContent />;
 }
