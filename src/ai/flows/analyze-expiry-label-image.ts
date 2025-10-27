@@ -38,17 +38,23 @@ const analyzeExpiryLabelImageFlow = ai.defineFlow(
     outputSchema: AnalyzeExpiryLabelImageOutputSchema,
   },
   async (input) => {
-    const { output } = await ai.generate({
+    const { text } = await ai.generate({
         model: googleAI.model('gemini-pro-vision'),
-        output: { schema: AnalyzeExpiryLabelImageOutputSchema },
         prompt: [
-            { text: `You are an expert in food safety and expiry label analysis.
-
-You will analyze the provided image of the expiry label and identify any inconsistencies, alterations, or signs of tampering. Provide a detailed analysis result.` },
+            { text: `You are an expert in food safety and expiry label analysis. Analyze the provided image of the expiry label and identify any inconsistencies, alterations, or signs of tampering. Provide a detailed analysis result. Your response must be a JSON object with a single key "analysisResult", like this: {"analysisResult": "Your analysis here."}` },
             { media: { url: input.photoDataUri } },
         ],
     });
 
-    return output!;
+    try {
+        // The model should return a JSON string. We parse it to get the object.
+        const result = JSON.parse(text);
+        // Validate the parsed object against our Zod schema.
+        return AnalyzeExpiryLabelImageOutputSchema.parse(result);
+    } catch (e) {
+        console.error("Failed to parse AI model response:", e);
+        // If parsing fails, wrap the raw text in the expected object structure.
+        return { analysisResult: `The AI model returned an unexpected response format. Raw response: ${text}` };
+    }
   }
 );

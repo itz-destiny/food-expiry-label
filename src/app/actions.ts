@@ -3,6 +3,9 @@
 
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getDb } from '@/firebase/admin';
+
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
@@ -21,7 +24,6 @@ export type SubmitReportResponse = {
 export async function submitReportAction(
   data: unknown
 ): Promise<SubmitReportResponse> {
-  const maxDuration = 60; // Increase timeout to 60 seconds
 
   const validatedFields = FormSchema.safeParse(data);
 
@@ -33,15 +35,29 @@ export async function submitReportAction(
     };
   }
 
-  const { photoDataUri } = validatedFields.data;
+  const { productName, storeLocation, labelDescription, photoDataUri, userId } = validatedFields.data;
 
   try {
     
     // Perform AI analysis
     const analysisResult = await analyzeExpiryLabelImage({ photoDataUri });
+    
+    // Save report to Firestore
+    const db = getDb();
+    await addDoc(collection(db, 'reports'), {
+      productName,
+      storeLocation,
+      labelDescription,
+      photoUrl: '', // Will be implemented later with file storage
+      userId,
+      analysisResult: analysisResult.analysisResult,
+      submissionDate: serverTimestamp(),
+      reportStatus: 'Pending',
+    });
+
 
     return {
-      message: 'Analysis complete!',
+      message: 'Report submitted and analysis complete!',
       analysis: analysisResult.analysisResult,
       error: false,
     };
