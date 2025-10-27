@@ -1,67 +1,74 @@
 /**
- * @file Firebase Security Rules for Shelf Watch Firestore database.
- *
- * Core Philosophy:
- * This ruleset prioritizes user data ownership and restricts broad access. User documents are private, while submitted reports have public read access but owner-only write access.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a user-ownership model for user profiles and allows users to create reports,
+ *              but restricts modification and deletion of reports to the report's owner.
  *
  * Data Structure:
- * - /users/{userId}: Stores individual user profiles, accessible only to the user themselves.
- * - /reports/{reportId}: Stores user-submitted reports. Anyone can read these reports, but only the submitting user can create, update, or delete them.
+ * - /users/{userId}: Stores user profile information, with the document ID matching the Firebase Auth UID.
+ * - /reports/{reportId}: Stores reports submitted by users. Each report contains a userId field indicating the submitter.
  *
  * Key Security Decisions:
- * - User listing is disallowed to prevent enumeration.
- * - Reports are publicly readable to facilitate data analysis and community review.
- * - Owner-only writes are enforced using the 'userId' field within the report documents.
+ * - Users can only read and write their own profile data.
+ * - Users can create reports, but only the owner can update or delete them.
+ * - Report listing is public, but report modification is restricted to the owner.
+ *
+ * Denormalization for Authorization:
+ * - The Report entity includes a userId field, which is used to enforce ownership for update and delete operations. This avoids the need for complex queries or additional reads to determine ownership.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Rules for user profiles. Only the user can read and write their own profile.
+     * @description Manages user profiles, restricting access to the profile owner.
      * @path /users/{userId}
-     * @allow (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can create their own profile.
-     * @deny (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' cannot create a profile with a different ID.
-     * @allow (get, update, delete) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can get, update, and delete their own profile.
-     * @deny (get, update, delete) User with ID 'otherUserId' cannot get, update, or delete the profile of user 'hMl8yLyoALh9kogR4OFwFxUpGPa2'.
-     * @principle Enforces user ownership for all operations on user profiles.
+     * @allow (create) User with UID 'user_abc' can create their profile.
+     * @deny (create) User with UID 'user_xyz' cannot create a profile for 'user_abc'.
+     * @allow (get, list) User with UID 'user_abc' can read their profile.
+     * @deny (get, list) User with UID 'user_xyz' cannot read 'user_abc's profile.
+     * @allow (update) User with UID 'user_abc' can update their own profile.
+     * @deny (update) User with UID 'user_xyz' cannot update 'user_abc's profile.
+     * @allow (delete) User with UID 'user_abc' can delete their profile.
+     * @deny (delete) User with UID 'user_xyz' cannot delete 'user_abc's profile.
+     * @principle Enforces document ownership for all operations on user profiles.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource.data.id == userId;
+      allow create: if isOwner(userId) && request.resource.data.id == userId && request.auth.uid == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rules for reports. Anyone can read reports, but only the owner can create, update, or delete.
+     * @description Manages reports submitted by users, allowing public reads and owner-only writes.
      * @path /reports/{reportId}
-     * @allow (get, list) Any user can read (get, list) any report.
-     * @allow (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can create a report with their user ID.
-     * @deny (create) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' cannot create a report with a different user ID.
-     * @allow (update, delete) User with ID 'hMl8yLyoALh9kogR4OFwFxUpGPa2' can update and delete their own report.
-     * @deny (update, delete) User with ID 'otherUserId' cannot update or delete the report of user 'hMl8yLyoALh9kogR4OFwFxUpGPa2'.
-     * @principle Allows public read access for reports while enforcing owner-only write access.
+     * @allow (create) User with UID 'user_abc' can create a report with userId 'user_abc'.
+     * @deny (create) User with UID 'user_xyz' cannot create a report with userId 'user_abc'.
+     * @allow (get, list) Any user can read any report.
+     * @allow (update) User with UID 'user_abc' can update a report where report.userId == 'user_abc'.
+     * @deny (update) User with UID 'user_xyz' cannot update a report where report.userId == 'user_abc'.
+     * @allow (delete) User with UID 'user_abc' can delete a report where report.userId == 'user_abc'.
+     * @deny (delete) User with UID 'user_xyz' cannot delete a report where report.userId == 'user_abc'.
+     * @principle Allows public read access to reports while enforcing ownership for write access.
      */
     match /reports/{reportId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.userId) && resource.data.userId == request.auth.uid;
-      allow delete: if isExistingOwner(resource.data.userId) && resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(resource.data.userId);
+      allow delete: if isExistingOwner(resource.data.userId);
     }
-  }
 
-  // Helper functions
-  function isSignedIn() {
-    return request.auth != null;
-  }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-  function isExistingOwner(userId) {
-    return isOwner(userId) && resource != null;
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
   }
 }
