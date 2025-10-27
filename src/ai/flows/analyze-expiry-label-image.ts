@@ -32,18 +32,6 @@ export async function analyzeExpiryLabelImage(input: AnalyzeExpiryLabelImageInpu
   return analyzeExpiryLabelImageFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'analyzeExpiryLabelImagePrompt',
-  input: {schema: AnalyzeExpiryLabelImageInputSchema},
-  output: {schema: AnalyzeExpiryLabelImageOutputSchema},
-  model: googleAI.model('gemini-pro-vision'),
-  prompt: `You are an expert in food safety and expiry label analysis.
-
-You will analyze the provided image of the expiry label and identify any inconsistencies, alterations, or signs of tampering. Provide a detailed analysis result.
-
-Image: {{media url=photoDataUri}}`,
-});
-
 const analyzeExpiryLabelImageFlow = ai.defineFlow(
   {
     name: 'analyzeExpiryLabelImageFlow',
@@ -51,7 +39,17 @@ const analyzeExpiryLabelImageFlow = ai.defineFlow(
     outputSchema: AnalyzeExpiryLabelImageOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const { output } = await ai.generate({
+        model: googleAI.model('gemini-pro-vision'),
+        output: { schema: AnalyzeExpiryLabelImageOutputSchema },
+        prompt: {
+            text: `You are an expert in food safety and expiry label analysis.
+
+You will analyze the provided image of the expiry label and identify any inconsistencies, alterations, or signs of tampering. Provide a detailed analysis result.`,
+            media: [{ url: input.photoDataUri }],
+        },
+    });
+
     return output!;
   }
 );
