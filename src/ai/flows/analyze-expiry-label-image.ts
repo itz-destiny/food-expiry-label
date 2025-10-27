@@ -11,6 +11,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const AnalyzeExpiryLabelImageInputSchema = z.object({
@@ -35,6 +36,7 @@ const prompt = ai.definePrompt({
   name: 'analyzeExpiryLabelImagePrompt',
   input: {schema: AnalyzeExpiryLabelImageInputSchema},
   output: {schema: AnalyzeExpiryLabelImageOutputSchema},
+  model: googleAI.model('gemini-pro-vision'),
   prompt: `You are an expert in food safety and expiry label analysis.
 
 You will analyze the provided image of the expiry label and identify any inconsistencies, alterations, or signs of tampering. Provide a detailed analysis result.
