@@ -2,8 +2,19 @@
 
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
-import { collection, addDoc } from 'firebase/firestore';
-import { initializeAdminFirebase } from '@/firebase/admin';
+import { collection, addDoc, getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { firebaseConfig } from '@/firebase/config';
+
+// This is the correct way to initialize firebase on the server for actions
+// It will not be bundled with the client
+const getDb = () => {
+    if (getApps().length === 0) {
+        initializeApp(firebaseConfig)
+    }
+    return getFirestore(getApp());
+}
+
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
@@ -41,9 +52,9 @@ export async function submitReportAction(
     // Perform AI analysis
     const analysisResult = await analyzeExpiryLabelImage({ photoDataUri });
 
-    // Initialize admin and save to firestore
-    const { firestore } = initializeAdminFirebase();
-    await addDoc(collection(firestore, 'reports'), {
+    // save to firestore
+    const db = getDb();
+    await addDoc(collection(db, 'reports'), {
       ...reportData,
       photoUrl: 'dummy_url_for_now', // Placeholder as we are not uploading to storage yet
       submissionDate: new Date().toISOString(),
