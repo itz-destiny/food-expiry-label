@@ -2,10 +2,17 @@
 'use server';
 
 import { z } from 'zod';
-import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { getDb } from '@/firebase/admin';
+import { collection, addDoc, serverTimestamp, getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { firebaseConfig } from '@/firebase/config';
 
+// Helper to initialize Firebase app on the server
+function getDb() {
+  if (!getApps().length) {
+    initializeApp(firebaseConfig);
+  }
+  return getFirestore(getApp());
+}
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
@@ -38,9 +45,7 @@ export async function submitReportAction(
   const { productName, storeLocation, labelDescription, photoDataUri, userId } = validatedFields.data;
 
   try {
-    
-    // Perform AI analysis
-    const analysisResult = await analyzeExpiryLabelImage({ photoDataUri });
+    const analysisResult = "Your report has been submitted for review. Thank you for your contribution.";
     
     // Save report to Firestore
     const db = getDb();
@@ -50,22 +55,22 @@ export async function submitReportAction(
       labelDescription,
       photoUrl: '', // Will be implemented later with file storage
       userId,
-      analysisResult: analysisResult.analysisResult,
+      analysisResult: "N/A", // AI analysis is removed for now
       submissionDate: serverTimestamp(),
       reportStatus: 'Pending',
     });
 
 
     return {
-      message: 'Report submitted and analysis complete!',
-      analysis: analysisResult.analysisResult,
+      message: 'Report submitted successfully!',
+      analysis: analysisResult,
       error: false,
     };
   } catch (e) {
     console.error(e);
     const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
     return {
-      message: `An error occurred during analysis: ${errorMessage}`,
+      message: `An error occurred while submitting the report: ${errorMessage}`,
       error: true,
     };
   }

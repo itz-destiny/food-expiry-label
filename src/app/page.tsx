@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Loader2, Package, ScanSearch, Store, UserX } from 'lucide-react';
+import { AlertTriangle, Loader2, Package, ScanSearch, Store, UserX, Send } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -20,8 +21,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 function SubmitButton({ isPending }: { isPending: boolean }) {
   return (
     <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isPending} size="lg">
-      {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2" />}
-      Analyze and Submit Report
+      {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2" />}
+      Submit Report
     </Button>
   );
 }
@@ -194,17 +195,17 @@ export default function Home() {
 
 
         <div className="lg:col-span-2 lg:sticky top-24 space-y-6">
-          <h2 className="text-3xl font-headline font-bold">Analysis Result</h2>
+          <h2 className="text-3xl font-headline font-bold">Status</h2>
           {isPending && !state && (
              <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg min-h-[300px]">
                 <Loader2 className="h-16 w-16 mb-4 animate-spin text-muted-foreground/30" />
-                <p>Analyzing... please wait.</p>
+                <p>Submitting report...</p>
               </div>
           )}
           {state && (
             <Alert variant={state.error ? 'destructive' : 'default'} className={cn(!state.error && "bg-accent/50 border-accent")}>
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>{state.error ? 'Error' : 'Analysis Complete'}</AlertTitle>
+              <AlertTitle>{state.error ? 'Error' : 'Success'}</AlertTitle>
               <AlertDescription>{state.message}</AlertDescription>
             </Alert>
           )}
@@ -213,7 +214,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ScanSearch />
-                  AI Analysis
+                  Submission Status
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -223,8 +224,8 @@ export default function Home() {
           ) : (
             !isPending && (
               <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg min-h-[300px]">
-                <ScanSearch className="h-16 w-16 mb-4 text-muted-foreground/30" />
-                <p>The analysis of your submitted image will appear here after you submit a report.</p>
+                <Send className="h-16 w-16 mb-4 text-muted-foreground/30" />
+                <p>The status of your submission will appear here after you submit a report.</p>
               </div>
             )
           )}
@@ -233,3 +234,4 @@ export default function Home() {
     </div>
   );
 }
+
