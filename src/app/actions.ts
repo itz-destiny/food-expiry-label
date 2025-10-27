@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getFirestore } from 'firebase/firestore';
 import { initializeAdminFirebase } from '@/firebase/admin';
 
 const FormSchema = z.object({
@@ -37,11 +37,12 @@ export async function submitReportAction(
   const { photoDataUri, ...reportData } = validatedFields.data;
 
   try {
-    const { firestore } = initializeAdminFirebase();
+    
     // Perform AI analysis
     const analysisResult = await analyzeExpiryLabelImage({ photoDataUri });
 
-    // Save the full report to Firestore
+    // Initialize admin and save to firestore
+    const { firestore } = initializeAdminFirebase();
     await addDoc(collection(firestore, 'reports'), {
       ...reportData,
       photoUrl: 'dummy_url_for_now', // Placeholder as we are not uploading to storage yet
@@ -49,6 +50,7 @@ export async function submitReportAction(
       reportStatus: 'Pending',
       analysisResult: analysisResult.analysisResult,
     });
+
 
     return {
       message: 'Analysis complete and report submitted successfully!',
@@ -59,7 +61,7 @@ export async function submitReportAction(
     console.error(e);
     const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
     return {
-      message: `An error occurred: ${errorMessage}`,
+      message: `An error occurred during analysis: ${errorMessage}`,
       error: true,
     };
   }
