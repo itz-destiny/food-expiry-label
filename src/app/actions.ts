@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
-import { collection, addDoc, getFirestore } from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 import { initializeAdminFirebase } from '@/firebase/admin';
 
 const FormSchema = z.object({
