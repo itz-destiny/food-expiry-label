@@ -1,4 +1,3 @@
-// This file is machine-generated - edit at your own risk.
 
 'use server';
 
@@ -38,7 +37,7 @@ const analyzeExpiryLabelImageFlow = ai.defineFlow(
     inputSchema: AnalyzeExpiryLabelImageInputSchema,
     outputSchema: AnalyzeExpiryLabelImageOutputSchema,
   },
-  async input => {
+  async (input) => {
     const { output } = await ai.generate({
         model: googleAI.model('gemini-1.0-pro-vision-001'),
         output: { schema: AnalyzeExpiryLabelImageOutputSchema },
