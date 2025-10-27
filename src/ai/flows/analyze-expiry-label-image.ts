@@ -39,7 +39,7 @@ const analyzeExpiryLabelImageFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await ai.generate({
-        model: googleAI.model('gemini-1.0-pro-vision-001'),
+        model: googleAI.model('gemini-pro-vision'),
         output: { schema: AnalyzeExpiryLabelImageOutputSchema },
         prompt: [
             { text: `You are an expert in food safety and expiry label analysis.
