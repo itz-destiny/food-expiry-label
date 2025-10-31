@@ -112,12 +112,12 @@ function AdminDashboardContent() {
     <div className="space-y-8">
       <h1 className="text-3xl md:text-4xl font-headline font-bold">Admin Dashboard</h1>
 
-      {reports === null && !isLoading && (
+      {reports?.length === 0 && !isLoading && (
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>No Data Yet</AlertTitle>
+          <AlertTitle>Awaiting First Report</AlertTitle>
           <AlertDescription>
-            The database is connected, but no reports have been submitted yet. Once reports are submitted, they will appear here.
+            The database is connected and ready. As soon as the first report is submitted, it will appear here.
           </AlertDescription>
         </Alert>
       )}
