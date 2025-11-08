@@ -29,12 +29,14 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 // Define the structure of a report document from Firestore
+type FirestoreDate = string | Date | { toDate: () => Date };
+
 interface Report {
   id: string;
   productName: string;
   storeLocation: string;
   reportStatus: 'Pending' | 'Reviewed' | 'Action Taken';
-  submissionDate: string; // ISO string
+  submissionDate?: FirestoreDate | null;
 }
 
 function AdminDashboardContent() {
@@ -48,17 +50,33 @@ function AdminDashboardContent() {
 
   const { data: reports, isLoading, error } = useCollection<Report>(reportsQuery);
 
+  const toDate = (value: FirestoreDate | null | undefined): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) {
+      return isNaN(value.getTime()) ? null : value;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const parsed = new Date(value);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (typeof value === 'object' && typeof value.toDate === 'function') {
+      const parsed = value.toDate();
+      return parsed instanceof Date && !isNaN(parsed.getTime()) ? parsed : null;
+    }
+    return null;
+  };
+
   const reportsByMonth = useMemo(() => {
     if (!reports) return [];
     const monthlyCounts = new Map<string, number>();
 
     reports.forEach(report => {
-      const month = format(new Date(report.submissionDate), 'MMM');
+      const date = toDate(report.submissionDate ?? null);
+      if (!date) return;
+      const month = format(date, 'MMM');
       monthlyCounts.set(month, (monthlyCounts.get(month) || 0) + 1);
     });
     
-    const sortedMonths = Array.from(monthlyCounts.keys()).sort((a,b) => new Date(`1970-01-01T00:00:00Z`).getMonth() - new Date(`${a} 1, 1970`).getMonth());
-
     // Create a list of the last 6 months for the chart
     const last6Months = [];
     const today = new Date();
@@ -169,7 +187,10 @@ function AdminDashboardContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reports && reports.slice(0, 5).map((report) => (
+                  {reports && reports.slice(0, 5).map((report) => {
+                    const submissionDate = toDate(report.submissionDate ?? null);
+                    const formattedDate = submissionDate ? format(submissionDate, 'yyyy-MM-dd') : 'N/A';
+                    return (
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">{report.productName}</TableCell>
                       <TableCell>{report.storeLocation}</TableCell>
@@ -182,9 +203,9 @@ function AdminDashboardContent() {
                           {report.reportStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{format(new Date(report.submissionDate), 'yyyy-MM-dd')}</TableCell>
+                      <TableCell className="text-right">{formattedDate}</TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
           </CardContent>
