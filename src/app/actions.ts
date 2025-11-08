@@ -2,17 +2,9 @@
 'use server';
 
 import { z } from 'zod';
-import { collection, addDoc, serverTimestamp, getFirestore } from 'firebase/firestore';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { firebaseConfig } from '@/firebase/config';
-
-// Helper to initialize Firebase app on the server
-function getDb() {
-  if (!getApps().length) {
-    initializeApp(firebaseConfig);
-  }
-  return getFirestore(getApp());
-}
+import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
+import { getDb } from '@/firebase/admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const FormSchema = z.object({
   productName: z.string().min(1, 'Product name is required.'),
@@ -26,6 +18,11 @@ export type SubmitReportResponse = {
   message: string;
   analysis?: string;
   error?: boolean;
+};
+
+export type TestAnalyzeImageResponse = {
+  analysisResult: string;
+  error?: string;
 };
 
 export async function submitReportAction(
@@ -45,18 +42,25 @@ export async function submitReportAction(
   const { productName, storeLocation, labelDescription, photoDataUri, userId } = validatedFields.data;
 
   try {
-    const analysisResult = "Your report has been submitted for review. Thank you for your contribution.";
+    let analysisResult = 'AI analysis could not be completed.';
+
+    try {
+      const aiResponse = await analyzeExpiryLabelImage({ photoDataUri });
+      analysisResult = aiResponse.analysisResult;
+    } catch (aiError) {
+      console.error('AI analysis failed:', aiError);
+    }
     
     // Save report to Firestore
     const db = getDb();
-    await addDoc(collection(db, 'reports'), {
+    await db.collection('reports').add({
       productName,
       storeLocation,
       labelDescription,
       photoUrl: '', // Will be implemented later with file storage
       userId,
-      analysisResult: "N/A", // AI analysis is removed for now
-      submissionDate: serverTimestamp(),
+      analysisResult,
+      submissionDate: FieldValue.serverTimestamp(),
       reportStatus: 'Pending',
     });
 
@@ -72,6 +76,26 @@ export async function submitReportAction(
     return {
       message: `An error occurred while submitting the report: ${errorMessage}`,
       error: true,
+    };
+  }
+}
+
+export async function testAnalyzeImageAction(photoDataUri: unknown): Promise<TestAnalyzeImageResponse> {
+  if (typeof photoDataUri !== 'string' || !photoDataUri.trim()) {
+    return {
+      analysisResult: '',
+      error: 'photoDataUri must be a non-empty string.',
+    };
+  }
+
+  try {
+    const result = await analyzeExpiryLabelImage({ photoDataUri });
+    return { analysisResult: result.analysisResult };
+  } catch (error) {
+    console.error('AI analysis test failed:', error);
+    return {
+      analysisResult: '',
+      error: error instanceof Error ? error.message : 'Unknown error occurred while running analysis.',
     };
   }
 }
