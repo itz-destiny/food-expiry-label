@@ -102,7 +102,7 @@ export function ReportForm() {
   const busy = phase.kind === 'working';
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-14">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-14">
       <div>
         <PageIntro eyebrow="Evidence submission" title="Report a suspicious product." highlight={['suspicious']}>
           Photos plus where and when you saw it give regulators what they need to act. Your report also warns the next
@@ -236,7 +236,7 @@ export function ReportForm() {
         </Reveal>
       </div>
 
-      <div className="lg:pt-24">
+      <div className="min-w-0 lg:pt-24">
         <AnimatePresence mode="wait">
           <motion.div
             key={phase.kind}

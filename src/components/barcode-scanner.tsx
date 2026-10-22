@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, ImagePlus, ScanBarcode, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -87,80 +88,85 @@ export function BarcodeScanner({ onDetected }: { onDetected: (code: string) => v
           setOpen(true);
         }}
       >
-        <ScanBarcode /> <span className="hidden sm:inline">Scan barcode</span>
+        <ScanBarcode /> <span className="sr-only sm:not-sr-only">Scan barcode</span>
       </Button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => {
-              stop();
-              setOpen(false);
-            }}
-          >
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Scan a barcode"
-              className="w-full max-w-md rounded-3xl border bg-surface p-5"
-              initial={{ scale: 0.95, y: 12 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 12 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-lg font-bold">
-                  <ScanBarcode className="h-5 w-5 text-primary" /> Scan barcode
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Close scanner"
-                  onClick={() => {
-                    stop();
-                    setOpen(false);
-                  }}
+      {/* Portal to <body> so the overlay sits above the fixed header, not inside the animated form. */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => {
+                  stop();
+                  setOpen(false);
+                }}
+              >
+                <motion.div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Scan a barcode"
+                  className="w-full max-w-md rounded-3xl border bg-surface p-5"
+                  initial={{ scale: 0.95, y: 12 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.95, y: 12 }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <X />
-                </Button>
-              </div>
-
-              <div className="relative mt-4 aspect-[4/3] overflow-hidden rounded-2xl border bg-black">
-                <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
-                <div className="pointer-events-none absolute inset-6 rounded-xl border-2 border-primary/70" />
-                <div
-                  className="pointer-events-none absolute inset-x-8 top-8 h-0.5 bg-primary"
-                  style={{ animation: 'scan 2.4s ease-in-out infinite', ['--scan-distance' as string]: '180px' }}
-                />
-                {!streaming && (
-                  <div className="absolute inset-0 grid place-items-center text-muted-foreground">
-                    <Camera className="h-10 w-10 opacity-40" />
+                  <div className="flex items-center justify-between">
+                    <h2 className="flex items-center gap-2 text-lg font-bold">
+                      <ScanBarcode className="h-5 w-5 text-primary" /> Scan barcode
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Close scanner"
+                      onClick={() => {
+                        stop();
+                        setOpen(false);
+                      }}
+                    >
+                      <X />
+                    </Button>
                   </div>
-                )}
-              </div>
 
-              {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
+                  <div className="relative mt-4 aspect-[4/3] overflow-hidden rounded-2xl border bg-black">
+                    <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+                    <div className="pointer-events-none absolute inset-6 rounded-xl border-2 border-primary/70" />
+                    <div
+                      className="pointer-events-none absolute inset-x-8 top-8 h-0.5 bg-primary"
+                      style={{ animation: 'scan 2.4s ease-in-out infinite', ['--scan-distance' as string]: '180px' }}
+                    />
+                    {!streaming && (
+                      <div className="absolute inset-0 grid place-items-center text-muted-foreground">
+                        <Camera className="h-10 w-10 opacity-40" />
+                      </div>
+                    )}
+                  </div>
 
-              <div className="mt-4 flex gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && scanPhoto(e.target.files[0])}
-                />
-                <Button type="button" variant="secondary" className="flex-1 rounded-xl" onClick={() => fileRef.current?.click()}>
-                  <ImagePlus /> Scan from photo
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
+                  {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
+
+                  <div className="mt-4 flex gap-2">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => e.target.files?.[0] && scanPhoto(e.target.files[0])}
+                    />
+                    <Button type="button" variant="secondary" className="flex-1 rounded-xl" onClick={() => fileRef.current?.click()}>
+                      <ImagePlus /> Scan from photo
+                    </Button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
     </>
   );
 }

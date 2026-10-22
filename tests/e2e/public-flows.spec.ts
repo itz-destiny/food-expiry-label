@@ -101,9 +101,16 @@ test.describe('verify: the four checks against the live registry', () => {
     await expect(page).toHaveURL(/\/report\?product=Tropika\+Orange\+Juice.*nafdac=A8-0050/, { timeout: 60_000 });
   });
 
-  test('verify page fits a phone screen @mobile', async ({ page }) => {
+  test('verify page fits a phone screen, before and after results @mobile', async ({ page, isMobile }) => {
     await page.goto('/verify');
     await expect(page.getByRole('button', { name: 'Run the 4 checks' })).toBeVisible();
+    await expectNoHorizontalScroll(page);
+
+    // Long one-line result text used to push the whole page wider than the phone.
+    await runChecks(page, { query: 'Tropika Orange Juice', expiry: isoDate(10), nafdac: 'A8-0050' });
+    await expectVerdict(page, 'Suspicious product');
+    // Phones scroll the results into view; on desktop they sit beside the form.
+    if (isMobile) await expect(page.getByText('Verdict', { exact: true })).toBeInViewport();
     await expectNoHorizontalScroll(page);
   });
 });

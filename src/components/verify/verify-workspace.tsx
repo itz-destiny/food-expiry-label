@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
@@ -34,6 +34,14 @@ export function VerifyWorkspace() {
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [photo, setPhoto] = useState<{ preview: string; status: 'reading' | 'done' | 'error'; note: string } | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // On phones the results sit below the form: bring them into view.
+  useEffect(() => {
+    if (!checking && !result) return;
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [checking, result]);
 
   const suggestions = useMemo(
     () => (focused && query.length > 1 ? searchProducts(registry.products, query) : []),
@@ -127,7 +135,7 @@ export function VerifyWorkspace() {
     : '/report';
 
   return (
-    <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-14">
       <div>
         <PageIntro eyebrow="Verification engine" title="Check a product before you buy it." highlight={['before', 'buy']}>
           Search by name, NAFDAC number or barcode. Add the expiry date and NAFDAC number printed on the pack and we run
@@ -299,7 +307,7 @@ export function VerifyWorkspace() {
         </Reveal>
       </div>
 
-      <div className="lg:pt-24">
+      <div ref={resultsRef} className="min-w-0 scroll-mt-24 lg:pt-24">
         <AnimatePresence mode="wait">
           {checking ? (
             <motion.div key="checking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
@@ -323,7 +331,7 @@ export function VerifyWorkspace() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="grid min-h-[420px] place-items-center rounded-3xl border border-dashed p-8 text-center"
+              className="hidden min-h-[420px] place-items-center rounded-3xl border border-dashed p-8 text-center lg:grid"
             >
               <div className="max-w-xs">
                 <span className="mx-auto grid h-14 w-14 place-items-center rounded-lg border-[1.5px] border-foreground bg-accent text-foreground">
@@ -364,14 +372,14 @@ function ResultPanel({ result, reportHref }: { result: VerificationResult; repor
             <p className={cn('eyebrow', tone.text)}>Verdict</p>
             <h2 className="mt-1 text-2xl font-extrabold sm:text-3xl">{copy.title}</h2>
             <p className="mt-2 text-sm text-muted-foreground">{copy.body}</p>
-            <p className="mt-3 truncate font-code text-xs text-muted-foreground">
+            <p className="mt-3 break-words font-code text-xs text-muted-foreground">
               {result.product?.name ?? result.input.query} · checked {format(result.checkedAt, 'd MMM yyyy, HH:mm')}
             </p>
           </div>
         </div>
       </motion.div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {result.checks.map((check, i) => {
           const t = STATUS_TONE[check.status];
           const Icon = CHECK_ICONS[check.id];
