@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 interface AuthState {
   user: User | null;
@@ -16,6 +16,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, isAdmin: false, loading: true });
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setTimeout(() => setState({ user: null, isAdmin: false, loading: false }), 0);
+      return;
+    }
     let active = true;
 
     const apply = async (user: User | null) => {

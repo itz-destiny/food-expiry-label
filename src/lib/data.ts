@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { requireSupabase, supabase } from './supabase';
 import type { Product, Report, ReportStatus } from './types';
 
 /* Row shapes as stored in Postgres (snake_case). */
@@ -77,18 +77,21 @@ function check<T>({ data, error }: { data: T | null; error: { message: string } 
 
 /** Product Search and Retrieval Engine: the registry. */
 export async function fetchProducts(): Promise<Product[]> {
+  requireSupabase();
   const rows = check(await supabase.from('products').select('*').order('name'));
   return (rows as ProductRow[]).map(toProduct);
 }
 
 /** Anonymised open reports for check 4 and community alerts (no reporter identity or photos). */
 export async function fetchReportSignals(): Promise<Report[]> {
+  requireSupabase();
   const rows = check(await supabase.rpc('report_signals'));
   return (rows as ReportRow[]).map(toReport);
 }
 
 /** Full reports — row-level security returns everything for admins, own reports otherwise. */
 export async function fetchReports(): Promise<Report[]> {
+  requireSupabase();
   const rows = check(await supabase.from('reports').select('*').order('created_at', { ascending: false }));
   return (rows as ReportRow[]).map(toReport);
 }
@@ -107,12 +110,14 @@ export interface NewReport {
 
 /** Evidence Submission Module: uploads the photo, then files the report. */
 export async function uploadEvidence(userId: string, photo: Blob): Promise<string> {
+  requireSupabase();
   const path = `${userId}/${crypto.randomUUID()}.jpg`;
   check(await supabase.storage.from('evidence').upload(path, photo, { contentType: 'image/jpeg' }));
   return path;
 }
 
 export async function createReport(userId: string, report: NewReport, photoPath: string): Promise<string> {
+  requireSupabase();
   const row = check(
     await supabase
       .from('reports')
@@ -138,6 +143,7 @@ export async function createReport(userId: string, report: NewReport, photoPath:
 
 /** Report Management Module. */
 export async function reviewReport(id: string, status: ReportStatus, actionNote: string) {
+  requireSupabase();
   check(
     await supabase
       .from('reports')
@@ -149,11 +155,13 @@ export async function reviewReport(id: string, status: ReportStatus, actionNote:
 }
 
 export async function evidenceUrl(path: string): Promise<string | null> {
+  requireSupabase();
   const { data } = await supabase.storage.from('evidence').createSignedUrl(path, 60 * 10);
   return data?.signedUrl ?? null;
 }
 
 export async function addProduct(p: Omit<Product, 'id' | 'source'>) {
+  requireSupabase();
   check(
     await supabase
       .from('products')

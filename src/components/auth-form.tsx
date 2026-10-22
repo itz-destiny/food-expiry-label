@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageShell, Reveal, SplitWords } from '@/components/motion';
-import { supabase } from '@/lib/supabase';
+import { NOT_CONFIGURED_MESSAGE, isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 function friendlyError(err: { code?: string; message: string }): string {
   const code = err.code ?? '';
@@ -35,6 +35,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     e.preventDefault();
     if (isSignup && password !== confirm) {
       setError('Passwords do not match.');
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      setError(NOT_CONFIGURED_MESSAGE);
       return;
     }
     setLoading(true);
