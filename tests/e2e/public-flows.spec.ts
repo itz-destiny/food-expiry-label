@@ -57,7 +57,7 @@ test.describe('verify: the four checks against the live registry', () => {
     await page.getByLabel('Product', { exact: true }).fill('tropi');
     await page.getByRole('button', { name: /Tropika Orange Juice/ }).click();
     await expect(page.getByLabel('Product', { exact: true })).toHaveValue('Tropika Orange Juice');
-    await expect(page.getByLabel('Barcode')).toHaveValue('6150000000055');
+    await expect(page.getByLabel('Barcode', { exact: true })).toHaveValue('6150000000051');
   });
 
   test('valid product passes all four checks', async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe('verify: the four checks against the live registry', () => {
   });
 
   test('barcode-only lookup finds the product', async ({ page }) => {
-    await runChecks(page, { barcode: '6150000000017', expiry: isoDate(200) });
+    await runChecks(page, { barcode: '6150000000013', expiry: isoDate(200) });
     await expect(page.getByText('Found in registry')).toBeVisible();
     await expect(page.getByText(/SunHarvest Instant Oats/).first()).toBeVisible();
   });

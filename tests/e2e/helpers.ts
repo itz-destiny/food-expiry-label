@@ -13,7 +13,7 @@ export async function runChecks(
 ) {
   await page.goto('/verify');
   if (input.query) await page.getByLabel('Product', { exact: true }).fill(input.query);
-  if (input.barcode) await page.getByLabel('Barcode').fill(input.barcode);
+  if (input.barcode) await page.getByLabel('Barcode', { exact: true }).fill(input.barcode);
   if (input.expiry) await page.getByLabel('Expiry date').fill(input.expiry);
   if (input.nafdac) await page.getByLabel('NAFDAC no.').fill(input.nafdac);
   // Wait until the registry has loaded so the product lookup has data.

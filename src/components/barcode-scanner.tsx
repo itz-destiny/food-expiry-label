@@ -4,46 +4,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, ImagePlus, ScanBarcode, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-
-// The Shape Detection API isn't in TypeScript's DOM lib yet.
-interface DetectedBarcode {
-  rawValue: string;
-}
-interface BarcodeDetectorLike {
-  detect(source: CanvasImageSource | ImageBitmap): Promise<DetectedBarcode[]>;
-}
-declare global {
-  interface Window {
-    BarcodeDetector?: new (options?: { formats?: string[] }) => BarcodeDetectorLike;
-  }
-}
-
-const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'];
-
-function createDetector(): BarcodeDetectorLike | null {
-  if (typeof window === 'undefined' || !window.BarcodeDetector) return null;
-  try {
-    return new window.BarcodeDetector({ formats: FORMATS });
-  } catch {
-    return null;
-  }
-}
+import { decodeBarcodeFromImage, scanFromCamera } from '@/lib/barcode';
 
 /**
- * Search and Barcode Scanning Module: live camera scanning where the browser
- * supports BarcodeDetector, scanning from a photo, or typing the digits.
+ * Search and Barcode Scanning Module: live camera scanning or scanning from a
+ * photo. Works in every modern browser (native detector or ZXing fallback).
  */
 export function BarcodeScanner({ onDetected }: { onDetected: (code: string) => void }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const stop = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
+    stopRef.current?.();
+    stopRef.current = null;
     setStreaming(false);
   }, []);
 
@@ -58,63 +35,45 @@ export function BarcodeScanner({ onDetected }: { onDetected: (code: string) => v
 
   useEffect(() => {
     if (!open) return;
-    const detector = createDetector();
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
 
     const start = async () => {
-      if (!detector) {
-        setMessage('Live scanning isn’t supported in this browser. Scan from a photo or type the barcode digits instead.');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMessage('This browser can’t open the camera here. Scan from a photo instead.');
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (cancelled) return stream.getTracks().forEach((t) => t.stop());
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-          setStreaming(true);
-        }
-        setMessage('Point the camera at the barcode.');
-        const tick = async () => {
-          if (cancelled || !videoRef.current) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes[0]?.rawValue) return finish(codes[0].rawValue);
-          } catch {
-            // Frame not ready yet; try again.
-          }
-          timer = setTimeout(tick, 250);
-        };
-        void tick();
-      } catch {
-        setMessage('Camera access was blocked. Allow the camera, or scan from a photo instead.');
+        setMessage('Starting camera…');
+        const stopCamera = await scanFromCamera(videoRef.current!, (code) => finish(code));
+        if (cancelled) return stopCamera();
+        stopRef.current = stopCamera;
+        setStreaming(true);
+        setMessage('Point the camera at the barcode and hold it steady.');
+      } catch (err) {
+        const name = (err as { name?: string })?.name;
+        setMessage(
+          name === 'NotAllowedError'
+            ? 'Camera access was blocked. Allow the camera in your browser, or scan from a photo instead.'
+            : name === 'NotFoundError'
+              ? 'No camera found on this device. Scan from a photo instead.'
+              : 'Couldn’t start the camera. Scan from a photo instead.'
+        );
       }
     };
     void start();
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
       stop();
     };
   }, [open, finish, stop]);
 
   const scanPhoto = async (file: File) => {
-    const detector = createDetector();
-    if (!detector) {
-      setMessage('This browser can’t read barcodes from photos. Type the digits under the barcode instead.');
-      return;
-    }
-    try {
-      const bitmap = await createImageBitmap(file);
-      const codes = await detector.detect(bitmap);
-      if (codes[0]?.rawValue) finish(codes[0].rawValue);
-      else setMessage('No barcode found in that photo. Try a closer, sharper shot.');
-    } catch {
-      setMessage('Couldn’t read that image.');
-    }
+    setMessage('Reading the barcode from your photo…');
+    const code = await decodeBarcodeFromImage(file);
+    if (fileRef.current) fileRef.current.value = '';
+    if (code) finish(code);
+    else setMessage('No barcode found in that photo. Try a closer, sharper, well-lit shot of just the barcode.');
   };
 
   return (
@@ -191,7 +150,6 @@ export function BarcodeScanner({ onDetected }: { onDetected: (code: string) => v
                   ref={fileRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   className="hidden"
                   onChange={(e) => e.target.files?.[0] && scanPhoto(e.target.files[0])}
                 />

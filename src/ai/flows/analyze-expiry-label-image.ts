@@ -9,8 +9,7 @@
  * - AnalyzeExpiryLabelImageOutput - The return type for the analyzeExpiryLabelImage function.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/google-genai';
+import {ai, withModelFallback} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const AnalyzeExpiryLabelImageInputSchema = z.object({
@@ -38,13 +37,13 @@ const analyzeExpiryLabelImageFlow = ai.defineFlow(
     outputSchema: AnalyzeExpiryLabelImageOutputSchema,
   },
   async (input) => {
-    const { text } = await ai.generate({
-        model: googleAI.model('gemini-2.0-flash'),
+    const { text } = await withModelFallback((model) => ai.generate({
+        model,
         prompt: [
             { text: `You are an expert in food safety and expiry label analysis. Analyze the provided image of the expiry label and identify any inconsistencies, alterations, or signs of tampering. Provide a detailed analysis result. Your response must be a JSON object with a single key "analysisResult", like this: {"analysisResult": "Your analysis here."}` },
             { media: { url: input.photoDataUri } },
         ],
-    });
+    }));
 
     try {
         // The model should return a JSON string. We parse it to get the object.

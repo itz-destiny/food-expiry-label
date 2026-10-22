@@ -1,16 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
 import { format } from 'date-fns';
-import { ArrowRight, Flag, Info, LoaderCircle, PackageSearch, Search, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Camera, CircleAlert, Flag, Info, LoaderCircle, PackageSearch, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageIntro, Reveal } from '@/components/motion';
 import { BarcodeScanner } from '@/components/barcode-scanner';
+import { readLabelAction } from '@/app/actions';
+import { decodeBarcodeFromImage, isValidGtin } from '@/lib/barcode';
+import { compressImage } from '@/lib/image';
 import { useRegistry } from '@/hooks/use-registry';
 import { searchProducts, verifyProduct, VERDICT_COPY, type VerificationResult } from '@/lib/verification';
 import { toDate } from '@/lib/types';
@@ -29,22 +32,89 @@ export function VerifyWorkspace() {
   const [focused, setFocused] = useState(false);
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<VerificationResult | null>(null);
+  const [photo, setPhoto] = useState<{ preview: string; status: 'reading' | 'done' | 'error'; note: string } | null>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
 
   const suggestions = useMemo(
     () => (focused && query.length > 1 ? searchProducts(registry.products, query) : []),
     [focused, query, registry.products]
   );
 
-  const run = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!query.trim() && !barcode.trim()) return;
+  const runWith = (input: { query: string; barcode: string; labelExpiry: string; labelNafdac: string }) => {
+    if (!input.query.trim() && !input.barcode.trim()) return;
     setChecking(true);
     setResult(null);
     // Short pause so the "checking" state registers; the engine itself is instant.
     setTimeout(() => {
-      setResult(verifyProduct({ query: query.trim(), barcode: barcode.trim(), labelExpiry, labelNafdac }, registry.products, registry.reports));
+      setResult(
+        verifyProduct(
+          { query: input.query.trim(), barcode: input.barcode.trim(), labelExpiry: input.labelExpiry, labelNafdac: input.labelNafdac },
+          registry.products,
+          registry.reports
+        )
+      );
       setChecking(false);
     }, 650);
+  };
+
+  const run = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    runWith({ query, barcode, labelExpiry, labelNafdac });
+  };
+
+  /** Verification by photo: decode the barcode locally and let the AI read the printed fields. */
+  const onLabelPhoto = async (file?: File) => {
+    if (photoRef.current) photoRef.current.value = '';
+    if (!file) return;
+    let preview: string;
+    try {
+      preview = await compressImage(file);
+    } catch {
+      setPhoto({ preview: '', status: 'error', note: 'That file couldn’t be opened as an image. Try a JPEG or PNG photo.' });
+      return;
+    }
+    setPhoto({ preview, status: 'reading', note: 'Reading the label…' });
+    setResult(null);
+
+    const [code, ai] = await Promise.all([decodeBarcodeFromImage(file), readLabelAction(preview)]);
+    const fields = ai.fields;
+    // Prefer the exact barcode decode; accept the AI's reading only if its check digit is valid.
+    const aiBarcode = fields?.barcode?.replace(/\D/g, '') ?? '';
+    const scannedBarcode = code ?? (isValidGtin(aiBarcode) ? aiBarcode : '');
+    const registryMatch = scannedBarcode ? registry.products.find((p) => p.barcode === scannedBarcode) : undefined;
+    const next = {
+      query: fields?.productName ?? registryMatch?.name ?? query,
+      barcode: scannedBarcode || barcode,
+      labelExpiry: fields?.expiryDate ?? labelExpiry,
+      labelNafdac: fields?.nafdacNumber?.toUpperCase() ?? labelNafdac,
+    };
+    setQuery(next.query);
+    setBarcode(next.barcode);
+    setLabelExpiry(next.labelExpiry);
+    setLabelNafdac(next.labelNafdac);
+
+    if (!next.query.trim() && !next.barcode.trim()) {
+      setPhoto({
+        preview,
+        status: 'error',
+        note: ai.error ?? 'Couldn’t find a product name or barcode in that photo. Try a closer shot of the front and the label.',
+      });
+      return;
+    }
+    const found = [
+      fields?.productName && 'name',
+      scannedBarcode && 'barcode',
+      fields?.nafdacNumber && 'NAFDAC number',
+      fields?.expiryDate && 'expiry date',
+    ].filter(Boolean);
+    setPhoto({
+      preview,
+      status: 'done',
+      note: ai.error
+        ? `Barcode read, but the AI couldn’t read the rest: ${ai.error}`
+        : `Read the ${found.join(', ')} from your photo — check them below.${fields?.notes ? ' ' + fields.notes : ''}`,
+    });
+    runWith(next);
   };
 
   const reportHref = result
@@ -66,6 +136,64 @@ export function VerifyWorkspace() {
 
         <Reveal immediate delay={0.35}>
           <form onSubmit={run} className="mt-8 space-y-5 panel-ink p-5 sm:p-6">
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              aria-label="Label photo"
+              onChange={(e) => onLabelPhoto(e.target.files?.[0])}
+            />
+            {photo ? (
+              <div className="flex items-start gap-3 rounded-xl border-[1.5px] border-foreground bg-accent/30 p-3">
+                {photo.preview && (
+                  // eslint-disable-next-line @next/next/no-img-element -- local data URI preview
+                  <img src={photo.preview} alt="Label photo" className="h-16 w-16 shrink-0 rounded-lg border object-cover" />
+                )}
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="flex items-center gap-1.5 font-semibold">
+                    {photo.status === 'reading' ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : photo.status === 'error' ? (
+                      <CircleAlert className="h-4 w-4 text-destructive" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 text-primary" />
+                    )}
+                    {photo.status === 'reading' ? 'Reading your label…' : photo.status === 'error' ? 'Couldn’t read the label' : 'Label read'}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{photo.note}</p>
+                  {photo.status !== 'reading' && (
+                    <button type="button" className="mt-1 text-xs font-semibold underline" onClick={() => photoRef.current?.click()}>
+                      Use another photo
+                    </button>
+                  )}
+                </div>
+                <button type="button" aria-label="Remove photo" className="text-muted-foreground hover:text-foreground" onClick={() => setPhoto(null)}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => photoRef.current?.click()}
+                className="flex w-full items-center gap-3 rounded-xl border-[1.5px] border-dashed border-foreground p-4 text-left transition-colors hover:bg-accent/30"
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border-[1.5px] border-foreground bg-accent">
+                  <Camera className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block font-semibold">Verify from a photo of the label</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Take or upload a photo — we read the name, barcode, NAFDAC number and expiry date.
+                  </span>
+                </span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-3 font-code text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span className="h-px flex-1 bg-border" /> or enter the details <span className="h-px flex-1 bg-border" />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="query">Product</Label>
               <div className="flex gap-2">
@@ -165,7 +293,7 @@ export function VerifyWorkspace() {
                 ? 'Loading the product registry…'
                 : registry.error
                 ? `Couldn’t reach the product registry: ${registry.error}`
-                : `${registry.products.length} products in the registry. Try "Tropika" or barcode 6150000000055.`}
+                : `${registry.products.length} products in the registry. Try "Tropika" or barcode 6150000000051.`}
             </p>
           </form>
         </Reveal>

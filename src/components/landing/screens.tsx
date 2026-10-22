@@ -39,7 +39,7 @@ function Pack({ expiry = 'EXP 14/03/2027', nafdac = 'NAFDAC REG NO. A8-0005', hi
         <p className={cn('mt-1 font-code text-[9px]', highlight === 'nafdac' && ring)}>{nafdac}</p>
         <div className={cn('mt-2', highlight === 'barcode' && ring)}>
           <Barcode />
-          <p className="mt-0.5 text-center font-code text-[8px] tracking-widest">6 150000 000055</p>
+          <p className="mt-0.5 text-center font-code text-[8px] tracking-widest">6 150000 000051</p>
         </div>
       </div>
     </div>

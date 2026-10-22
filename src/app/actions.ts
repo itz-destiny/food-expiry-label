@@ -1,6 +1,7 @@
 'use server';
 
 import { analyzeExpiryLabelImage } from '@/ai/flows/analyze-expiry-label-image';
+import { readLabel, type ReadLabelOutput } from '@/ai/flows/read-label';
 
 export type TestAnalyzeImageResponse = {
   analysisResult: string;
@@ -30,4 +31,22 @@ export async function analyzeLabelAction(photoDataUri: unknown): Promise<TestAna
 
 export async function testAnalyzeImageAction(photoDataUri: unknown): Promise<TestAnalyzeImageResponse> {
   return analyzeLabelAction(photoDataUri);
+}
+
+export type ReadLabelResponse = { fields?: ReadLabelOutput; error?: string };
+
+/** Verification by photo: reads the label's name, barcode, NAFDAC number and expiry. */
+export async function readLabelAction(photoDataUri: unknown): Promise<ReadLabelResponse> {
+  if (typeof photoDataUri !== 'string' || !photoDataUri.startsWith('data:image/')) {
+    return { error: 'Choose a photo of the label.' };
+  }
+  if (!process.env.GOOGLE_GENAI_API_KEY && !process.env.GEMINI_API_KEY) {
+    return { error: 'Label reading isn’t configured on this server (GOOGLE_GENAI_API_KEY is missing).' };
+  }
+  try {
+    return { fields: await readLabel(photoDataUri) };
+  } catch (error) {
+    console.error('Label reading failed:', error);
+    return { error: 'Couldn’t read that label. Try a sharper, well-lit photo, or type the details instead.' };
+  }
 }
