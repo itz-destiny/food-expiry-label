@@ -3,66 +3,50 @@
 @tailwind utilities;
 
 @layer base {
+  /* Paper-white "food label" theme: ink type, ruled lines, one solid green,
+     a yellow highlighter. No gradients anywhere. */
   :root {
-    --background: 120 60% 97.1%; /* very light green - #F0FFF0 */
-    --foreground: 224 71.4% 4.1%;
+    --background: 45 33% 98%;
+    --foreground: 150 22% 8%;
+
+    --surface: 0 0% 100%;
+    --surface-2: 45 22% 95%;
 
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    --card-foreground: 150 22% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
+    --popover-foreground: 150 22% 8%;
 
-    --primary: 120 73.4% 65%; /* fresh green - #90EE90 - slightly darkened for better contrast */
-    --primary-foreground: 222.2 84% 4.9%;
+    --primary: 152 64% 28%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 120 10% 92%;
-    --secondary-foreground: 224 71.4% 4.1%;
+    --secondary: 45 20% 93%;
+    --secondary-foreground: 150 22% 8%;
 
-    --muted: 120 10% 92%;
-    --muted-foreground: 222.2 44% 4.9%;
+    --muted: 45 20% 94%;
+    --muted-foreground: 150 6% 36%;
 
-    --accent: 56 76.5% 85%; /* desaturated yellow - #FAFAD2 - slightly darkened for better contrast */
-    --accent-foreground: 222.2 84% 4.9%;
+    --accent: 48 100% 62%;
+    --accent-foreground: 150 22% 8%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 4 74% 48%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 120 20% 88%;
-    --input: 120 20% 93%;
-    --ring: 120 73.4% 65%;
+    --warning: 30 92% 40%;
+    --success: 152 64% 28%;
 
-    --radius: 0.5rem;
-  }
+    --border: 45 12% 84%;
+    --input: 45 12% 80%;
+    --ring: 152 64% 28%;
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --chart-1: 152 64% 28%;
+    --chart-2: 48 100% 55%;
+    --chart-3: 4 74% 48%;
+    --chart-4: 210 70% 42%;
+    --chart-5: 280 45% 45%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 120 73.4% 75.3%;
-    --primary-foreground: 222.2 84% 4.9%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 56 76.5% 85%;
-    --accent-foreground: 222.2 84% 4.9%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 120 73.4% 75.3%;
+    --radius: 0.625rem;
   }
 }
 
@@ -70,7 +54,73 @@
   * {
     @apply border-border;
   }
+  html {
+    color-scheme: light;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-body;
+  }
+  h1, h2, h3, h4 {
+    @apply font-headline tracking-tight;
+  }
+  ::selection {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+}
+
+@layer components {
+  /* Standard content panel. */
+  .panel {
+    @apply rounded-2xl border bg-card;
+  }
+  /* Feature panel: ink outline with a hard offset shadow, like a printed sticker. */
+  .panel-ink {
+    @apply rounded-2xl border-[1.5px] border-foreground bg-card;
+    box-shadow: 5px 5px 0 0 hsl(var(--foreground));
+  }
+  .panel-ink-hover {
+    @apply transition-transform duration-200;
+  }
+  .panel-ink-hover:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 7px 7px 0 0 hsl(var(--foreground));
+  }
+}
+
+@layer utilities {
+  /* Solid highlighter behind key words. */
+  .mark {
+    background-color: hsl(var(--accent));
+    padding: 0 0.12em;
+    margin: 0 -0.04em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .eyebrow {
+    @apply font-code text-xs font-semibold uppercase tracking-[0.18em] text-primary;
+  }
+  .rule-thick {
+    @apply h-2 w-full bg-foreground;
+  }
+  .rule {
+    @apply h-px w-full bg-foreground;
+  }
+  .stamp {
+    @apply rounded-md border-[3px] px-3 py-1 font-headline font-black uppercase tracking-widest;
+  }
+}
+
+@keyframes scan {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(var(--scan-distance, 120px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
