@@ -6,7 +6,8 @@ import { config as loadDotenv } from 'dotenv';
 loadEnvConfig(process.cwd(), true);
 loadDotenv({ path: '.env.test.local' });
 
-const PORT = 9002;
+// Tests run against a production build (what Vercel serves), not the dev server.
+const PORT = 9010;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -27,9 +28,9 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'], channel: 'chrome' }, grep: /@mobile/ },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: `npx next build && npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: true,
-    timeout: 180_000,
+    timeout: 600_000,
   },
 });

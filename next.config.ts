@@ -1,7 +1,14 @@
 import type {NextConfig} from 'next';
 
+// Pin the project root: a stray lockfile in a parent folder otherwise makes
+// Next treat that folder as the root and watch far too many files.
+const projectRoot = __dirname;
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    root: projectRoot,
+  },
+  outputFileTracingRoot: projectRoot,
   typescript: {
     ignoreBuildErrors: true,
   },
